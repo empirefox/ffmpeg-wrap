@@ -1,63 +1,39 @@
-#ifndef GANG_GANG_DECODER_H
-#define GANG_GANG_DECODER_H
-#ifdef __cplusplus
-extern "C" {
-#endif
-#include <stdint.h>
-#include <libavcodec/avcodec.h> 
-#include <libavformat/avformat.h> 
+#ifndef GANG_GANG_DECODER_HH
+#define GANG_GANG_DECODER_HH
 
-#include "stdint.h"
+#include "webrtc/base/basictypes.h"
+#include "webrtc/base/constructormagic.h"
+#include "gang_decoder.h"
+#include "gang_decoder_impl.h"
 
-struct gang_decoder {
-	char* url;
-	int best_width;
-	int best_height;
-	int best_fps;
-	AVFormatContext *i_fmt_ctx;
+namespace gang {
 
-	AVCodecContext* video_dec_ctx;
-
-	AVCodecContext* audio_dec_ctx;
-
-	unsigned video_stream_index;
-	unsigned audio_stream_index;
-
-	AVPacket i_pkt;
-
-	// and more
+struct GangFrame {
+	uint8* data;
+	uint32 size;
+	bool is_video;
 };
 
-struct gang_frame {
-	uint8_t* data;
-	int size;
-	int is_video;
-	int64_t pts;
-	int status;
+class GangDecoder {
+public:
+	explicit GangDecoder(const char* url);
+	~GangDecoder();
+
+	bool Init();
+	bool Start();
+	void Stop();
+
+	int GetBestWidth();
+	int GetBestHeight();
+	int GetBestFps();
+
+	GangFrame NextFrame();
+private:
+	gang_decoder* decoder_;
+
+	DISALLOW_COPY_AND_ASSIGN(GangDecoder);
 };
 
-// create gang_decode with given url
-struct gang_decoder* new_gang_decoder(const char* url);
+}  // namespace gang
 
-// get best format and store to struct
-int init_gang_decoder(struct gang_decoder* decoder_);
-
-// prepare AVCodecContext... and store to struct
-int start_gang_decode(struct gang_decoder* decoder_);
-
-// read single frame, do not use allocate
-struct gang_frame* gang_decode_next_frame(struct gang_decoder* decoder_);
-
-void free_gang_frame(struct gang_frame* gang_decode_frame);
-
-// disconnect from remote stream and free AVCodecContext...
-void stop_gang_decode(struct gang_decoder* decoder_);
-
-// free gang_decoder
-void free_gang_decode(struct gang_decoder* decoder_);
-
-#ifdef __cplusplus
-} // closing brace for extern "C"
-#endif
-
-#endif // GANG_GANG_DECODER_H
+#endif // GANG_GANG_DECODER_HH

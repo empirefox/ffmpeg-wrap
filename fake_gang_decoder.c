@@ -1,6 +1,6 @@
 //#define NO_GANG
 #ifdef NO_GANG
-#include "gang_decoder.h"
+#include "gang_decoder_impl.h"
 
 // create gang_decode with given url
 struct gang_decoder* new_gang_decoder(const char* url) {

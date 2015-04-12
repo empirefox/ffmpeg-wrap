@@ -1,5 +1,5 @@
-#include  "gang_decoder.hh"
 #include  "gang_decoder.h"
+#include  "gang_decoder_impl.h"
 
 namespace gang {
 
@@ -21,6 +21,16 @@ bool GangDecoder::Start() {
 
 void GangDecoder::Stop() {
 	::stop_gang_decode(decoder_);
+}
+
+int GangDecoder::GetBestWidth() {
+	return decoder_->best_width;
+}
+int GangDecoder::GetBestHeight() {
+	return decoder_->best_height;
+}
+int GangDecoder::GetBestFps() {
+	return decoder_->best_fps;
 }
 
 GangFrame GangDecoder::NextFrame() {
