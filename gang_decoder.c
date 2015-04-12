@@ -43,6 +43,7 @@ int init_gang_decoder(struct gang_decoder* decoder_){
 	AVCodecContext* audio_dec_ctx = NULL;
 	AVCodec* audio_dec = NULL;
 
+	i_fmt_ctx = avformat_alloc_context();
 
 	if (avformat_open_input(&i_fmt_ctx, decoder_->url, NULL, NULL) != 0)
 	{
@@ -79,6 +80,8 @@ int init_gang_decoder(struct gang_decoder* decoder_){
 		decoder_->best_width = video_dec_ctx->width;
 		decoder_->best_height = video_dec_ctx->height;
 	}
+
+	avformat_close_input(&i_fmt_ctx);
 	return 1;
 }
 // prepare AVCodecContext... and store to struct
@@ -90,6 +93,8 @@ int start_gang_decode(struct gang_decoder* decoder_){
 	AVCodec* video_dec = NULL;
 	
 	AVCodec* audio_dec = NULL;
+
+	decoder_->i_fmt_ctx = avformat_alloc_context();
 
 	if (avformat_open_input(&decoder_->i_fmt_ctx, decoder_->url, NULL, NULL) != 0)
 	{
@@ -132,12 +137,14 @@ int start_gang_decode(struct gang_decoder* decoder_){
 			return 0;
 		}
 	}
+
 	av_init_packet(&decoder_->i_pkt);
 	return 1;
 }
 
 struct gang_frame* gang_decode_next_frame(struct gang_decoder* decoder_){
 
+	
 	if (av_read_frame(decoder_->i_fmt_ctx, &decoder_->i_pkt) < 0){
 		fprintf(stderr, "av_read_frame error!\n");
 	}
@@ -150,16 +157,38 @@ struct gang_frame* gang_decode_next_frame(struct gang_decoder* decoder_){
 
 		avcodec_decode_video2(decoder_->video_dec_ctx, pFrame, &got_picture, &decoder_->i_pkt);
 		if (got_picture) {
-		
-			gang_read_frame->data = decoder_->i_pkt.data;
+
+			gang_read_frame->data = malloc(decoder_->video_dec_ctx->height * decoder_->video_dec_ctx->width * 3 / 2);
+
+			memset(gang_read_frame->data, 0, decoder_->video_dec_ctx->height * decoder_->video_dec_ctx->width * 3 / 2);
+
+			int height = decoder_->video_dec_ctx->height;
+			int width = decoder_->video_dec_ctx->width;
+			printf("decode video ok\n");
+			int a = 0, i;
+			for (i = 0; i<height; i++)
+			{
+				memcpy(gang_read_frame->data + a, pFrame->data[0] + i * pFrame->linesize[0], width);
+				a += width;
+			}
+			for (i = 0; i<height / 2; i++)
+			{
+				memcpy(gang_read_frame->data + a, pFrame->data[1] + i * pFrame->linesize[1], width / 2);
+				a += width / 2;
+			}
+			for (i = 0; i<height / 2; i++)
+			{
+				memcpy(gang_read_frame->data + a, pFrame->data[2] + i * pFrame->linesize[2], width / 2);
+				a += width / 2;
+			}
 			gang_read_frame->size = decoder_->i_pkt.size;
 			gang_read_frame->pts = decoder_->i_pkt.pts;
 			gang_read_frame->is_video = 1;
-
+			gang_read_frame->status = 1;
 		}
 		else{
 			fprintf(stderr, "decode video frame error!\n");
-			gang_read_frame->data = 0;
+			gang_read_frame->data = NULL;
 			gang_read_frame->size = 0;
 			gang_read_frame->pts = 0;
 			gang_read_frame->is_video = 1;
@@ -172,7 +201,9 @@ struct gang_frame* gang_decode_next_frame(struct gang_decoder* decoder_){
 		avcodec_decode_audio4(decoder_->audio_dec_ctx, pFrame, &got_picture, &decoder_->i_pkt);
 		if (got_picture) {
 			//fprintf(stderr, "decode one audio frame!\n");
-			gang_read_frame->data = decoder_->i_pkt.data;
+			gang_read_frame->data = (uint8_t*)malloc(decoder_->i_pkt.size);
+			memcpy(gang_read_frame->data, pFrame->data, decoder_->i_pkt.size);
+			
 			gang_read_frame->size = decoder_->i_pkt.size;
 			gang_read_frame->pts = decoder_->i_pkt.pts;
 			gang_read_frame->is_video = 0;
@@ -181,7 +212,7 @@ struct gang_frame* gang_decode_next_frame(struct gang_decoder* decoder_){
 		else{
 			fprintf(stderr, "decode audio frame error!\n");
 
-			gang_read_frame->data = 0;
+			gang_read_frame->data = NULL;
 			gang_read_frame->size = 0;
 			gang_read_frame->pts = 0;
 			gang_read_frame->is_video = 0;
@@ -189,11 +220,17 @@ struct gang_frame* gang_decode_next_frame(struct gang_decoder* decoder_){
 		}
 	}
 	av_free_packet(&decoder_->i_pkt);
+	avcodec_free_frame(&pFrame);
 	return gang_read_frame;
 
 }
-
-
+void free_gang_frame(struct gang_frame* gang_decode_frame){
+	if (gang_decode_frame->data!=NULL)
+	free(gang_decode_frame->data);
+	if (gang_decode_frame != NULL){
+		free(gang_decode_frame);
+	}
+}
 // disconnect from remote stream and free AVCodecContext...
 void stop_gang_decode(struct gang_decoder* decoder_){
 	avformat_close_input(&decoder_->i_fmt_ctx);
