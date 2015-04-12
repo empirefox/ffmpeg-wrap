@@ -141,7 +141,7 @@ struct gang_frame* gang_decode_next_frame(struct gang_decoder* decoder_){
 	if (av_read_frame(decoder_->i_fmt_ctx, &decoder_->i_pkt) < 0){
 		fprintf(stderr, "av_read_frame error!\n");
 	}
-	AVFrame *pFrame = avcodec_alloc_frame();
+	AVFrame *pFrame = av_frame_alloc();
 	int got_picture = 0, ret = 0;
 	struct gang_frame*  gang_read_frame = (struct gang_frame*)malloc(sizeof(struct gang_frame));
 
