@@ -24,11 +24,11 @@ void GangDecoder::Stop() {
 }
 
 GangFrame GangDecoder::NextFrame() {
-	gang_frame frame_ = ::gang_decode_next_frame(decoder_);
+	gang_frame* frame_ = ::gang_decode_next_frame(decoder_);
 	GangFrame frame;
-	frame.data = reinterpret_cast<uint8*>(frame_.data);
-	frame.size = static_cast<uint32>(frame_.size);
-	frame.is_video = frame_.is_video == 1;
+	frame.data = reinterpret_cast<uint8*>(frame_->data);
+	frame.size = static_cast<uint32>(frame_->size);
+	frame.is_video = frame_->is_video == 1;
 	return frame;
 }
 

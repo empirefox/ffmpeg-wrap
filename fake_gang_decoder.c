@@ -24,9 +24,8 @@ int start_gang_decode(struct gang_decoder* decoder_) {
 }
 
 // read single frame, do not use allocate
-struct gang_frame gang_decode_next_frame(struct gang_decoder* decoder_) {
-	struct gang_frame f = { };
-	return f;
+struct gang_frame* gang_decode_next_frame(struct gang_decoder* decoder_) {
+	return NULL;
 }
 
 // disconnect from remote stream and free AVCodecContext...
