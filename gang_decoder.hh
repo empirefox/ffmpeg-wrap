@@ -1,6 +1,7 @@
 #ifndef GANG_GANG_DECODER_HH
 #define GANG_GANG_DECODER_HH
 
+#include "webrtc/base/basictypes.h"
 #include "webrtc/base/constructormagic.h"
 #include "gang_decoder.h"
 

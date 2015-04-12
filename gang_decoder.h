@@ -4,6 +4,8 @@
 extern "C" {
 #endif
 
+#include "stdint.h"
+
 struct gang_decoder {
 	char* url;
 	int best_width;
