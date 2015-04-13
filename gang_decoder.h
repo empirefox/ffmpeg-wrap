@@ -3,32 +3,48 @@
 
 #include "webrtc/base/basictypes.h"
 #include "webrtc/base/constructormagic.h"
+#include "talk/media/base/videocapturer.h"
 #include "gang_decoder.h"
 #include "gang_decoder_impl.h"
 
 namespace gang {
 
-struct GangFrame {
-	uint8* data;
-	uint32 size;
-	bool is_video;
+// need be shared_ptr
+class VideoFrameObserver {
+public:
+	// signal data
+	virtual void OnVideoFrame(uint8* data, uint32 size) = 0;
+	virtual void OnBestFormat(int width, int height, int fps) = 0;
+protected:
+	~VideoFrameObserver() {
+	}
+};
+
+// need be shared_ptr
+class AudioFrameObserver {
+public:
+	// signal data
+	virtual void OnAudioFrame(uint8* data, uint32 size) = 0;
+protected:
+	~AudioFrameObserver() {
+	}
 };
 
 class GangDecoder {
 public:
-	explicit GangDecoder(const char* url);
+	explicit GangDecoder(const char* url,
+			VideoFrameObserver* video_frame_observer,
+			AudioFrameObserver* audio_frame_observer);
 	~GangDecoder();
 
 	bool Init();
 	bool Start();
 	void Stop();
 
-	int GetBestWidth();
-	int GetBestHeight();
-	int GetBestFps();
-
-	GangFrame NextFrame();
+	void NextFrameLoop();
 private:
+	VideoFrameObserver* video_frame_observer_;
+	AudioFrameObserver* audio_frame_observer_;
 	gang_decoder* decoder_;
 
 	DISALLOW_COPY_AND_ASSIGN(GangDecoder);

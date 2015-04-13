@@ -37,6 +37,7 @@
 								<option id="gnu.cpp.compiler.option.preprocessor.def.678380967" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="WEBRTC_POSIX"/>
 									<listOptionValue builtIn="false" value="POSIX"/>
+									<listOptionValue builtIn="false" value="__GXX_EXPERIMENTAL_CXX0X__"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.1755124362" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
 							</tool>
