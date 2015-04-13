@@ -36,7 +36,12 @@ int init_gang_decoder(struct gang_decoder* decoder, int* best_width,
 // prepare AVCodecContext... and store to struct
 int start_gang_decode(struct gang_decoder* decoder);
 
-// read a single frame
+// Read a single frame.
+// WebRTC support: I420, YUY2, UYVY, ARGB.
+// I420 will not be converted again, other format will not be supported
+// until changing the api(init_gang_decoder) to output the format to c++.
+// For HD avoid YU12 which is a software conversion and has 2 bugs.
+//
 // output: *data, need allocate and assign to **data.(do not free it)
 //         size
 // return: 0->error, 1->video, 2->audio
