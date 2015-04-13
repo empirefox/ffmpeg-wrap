@@ -20,7 +20,7 @@ bool GangDecoder::Init() {
 	int* best_width;
 	int* best_height;
 	int* best_fps;
-	if (::init_gang_decoder(decoder_, best_width, best_height, best_fps)) {
+	if (::init_gang_decoder(decoder_, best_width, best_height, best_fps) == 1) {
 		video_frame_observer_->OnBestFormat(*best_width, *best_height,
 				*best_fps);
 		ok = true;
@@ -29,7 +29,7 @@ bool GangDecoder::Init() {
 }
 
 bool GangDecoder::Start() {
-	return ::start_gang_decode(decoder_);
+	return ::start_gang_decode(decoder_) == 1;
 }
 
 void GangDecoder::Stop() {
@@ -41,10 +41,14 @@ void GangDecoder::NextFrameLoop() {
 	int *size;
 	switch (::gang_decode_next_frame(decoder_, data, size)) {
 	case 1:
-		video_frame_observer_->OnVideoFrame(*data, static_cast<uint32>(*size));
+		if (video_frame_observer_ != NULL)
+			video_frame_observer_->OnVideoFrame(reinterpret_cast<uint8*>(*data),
+					static_cast<uint32>(*size));
 		break;
 	case 2:
-		audio_frame_observer_->OnAudioFrame(*data, static_cast<uint32>(*size));
+		if (audio_frame_observer_ != NULL)
+			audio_frame_observer_->OnAudioFrame(reinterpret_cast<uint8*>(*data),
+					static_cast<uint32>(*size));
 		break;
 	default:
 		break;
