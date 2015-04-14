@@ -20,9 +20,13 @@ public:
 	void RegistryVideo(
 			webrtc::PeerConnectionFactoryInterface* peer_connection_factory,
 			const std::string url);
+
+	void RegistryDecoder(
+			webrtc::PeerConnectionFactoryInterface* peer_connection_factory,
+			const std::string url);
 private:
 	std::map<std::string, std::shared_ptr<webrtc::VideoSourceInterface> > videos_;
-	std::unique_ptr<GangVideoCapturerFactory> video_capturer_factory_;
+	GangVideoCapturerFactory video_capturer_factory_;
 };
 
 }  // namespace gang

@@ -55,4 +55,14 @@ void GangDecoder::NextFrameLoop() {
 	}
 }
 
+void GangDecoder::SetVideoFrameObserver(
+		VideoFrameObserver* video_frame_observer) {
+	video_frame_observer_ = video_frame_observer;
+}
+
+void GangDecoder::SetAudioFrameObserver(
+		AudioFrameObserver* audio_frame_observer) {
+	audio_frame_observer_ = audio_frame_observer;
+}
+
 }  // namespace gang

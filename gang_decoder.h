@@ -33,8 +33,8 @@ protected:
 class GangDecoder {
 public:
 	explicit GangDecoder(const char* url,
-			VideoFrameObserver* video_frame_observer,
-			AudioFrameObserver* audio_frame_observer);
+			VideoFrameObserver* video_frame_observer = NULL,
+			AudioFrameObserver* audio_frame_observer = NULL);
 	~GangDecoder();
 
 	bool Init();
@@ -42,6 +42,9 @@ public:
 	void Stop();
 
 	void NextFrameLoop();
+
+	void SetVideoFrameObserver(VideoFrameObserver* video_frame_observer_);
+	void SetAudioFrameObserver(AudioFrameObserver* audio_frame_observer_);
 private:
 	VideoFrameObserver* video_frame_observer_;
 	AudioFrameObserver* audio_frame_observer_;

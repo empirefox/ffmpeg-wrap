@@ -8,4 +8,6 @@ public:
 	}
 
 	virtual cricket::VideoCapturer* Create(const cricket::Device& device);
+
+	virtual GangVideoCapturer* GangCreate(const cricket::Device& device);
 };
