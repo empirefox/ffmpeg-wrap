@@ -7,8 +7,10 @@
 
 using namespace cricket;
 
-// Simulated video capturer that periodically reads frames from a file.
-class GangVideoCapturer: public VideoCapturer {
+namespace gang {
+
+// Simulated video capturer that reads frames from a url.
+class GangVideoCapturer: public VideoCapturer, public VideoFrameObserver {
 public:
 	static const int kForever = -1;
 
@@ -18,13 +20,13 @@ public:
 	// Determines if the given device is actually a video file, to be captured
 	// with a GangVideoCapturer.
 	static bool IsGangVideoCapturerDevice(const Device& device) {
-		return rtc::starts_with(device.id.c_str(), kVideoFileDevicePrefix);
+		return rtc::starts_with(device.id.c_str(), kVideoGangDevicePrefix);
 	}
 
 	// Creates a fake device for the given filename.
 	static Device CreateGangVideoCapturerDevice(const std::string& filename) {
 		std::stringstream id;
-		id << kVideoFileDevicePrefix << filename;
+		id << kVideoGangDevicePrefix << filename;
 		return Device(filename, id.str());
 	}
 
@@ -43,6 +45,11 @@ public:
 		return false;
 	}
 
+	void SetGangThread(rtc::Thread* gang_thread);
+	// Implements VideoFrameObserver
+	virtual void OnVideoFrame(uint8* data, uint32 size);
+	virtual void OnBestFormat(int width, int height, int fps);
+
 protected:
 	// Override virtual methods of parent class VideoCapturer.
 	virtual bool GetPreferredFourccs(std::vector<uint32>* fourccs);
@@ -56,13 +63,16 @@ protected:
 
 private:
 
-	static const char* kVideoFileDevicePrefix;
+	static const char* kVideoGangDevicePrefix;
 	CapturedFrame captured_frame_;
 	// The number of bytes allocated buffer for captured_frame_.data.
 	uint32 frame_buffer_size_;
 	int64 start_time_ns_;  // Time when the file video capturer starts.
+	rtc::Thread* gang_thread_;
 
 	DISALLOW_COPY_AND_ASSIGN(GangVideoCapturer);
 };
+
+}  // namespace gang
 
 #endif  // GANGVIDEOCAPTURER_H_

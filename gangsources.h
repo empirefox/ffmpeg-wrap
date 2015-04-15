@@ -9,6 +9,8 @@
 
 namespace gang {
 
+// Connect sources to GangDecoder
+// Provide video/audio source by url
 class GangSources {
 public:
 	GangSources();
@@ -17,15 +19,17 @@ public:
 	std::shared_ptr<webrtc::VideoSourceInterface> GetVideo(
 			const std::string& url);
 
-	void RegistryVideo(
-			webrtc::PeerConnectionFactoryInterface* peer_connection_factory,
-			const std::string url);
+	// TODO not yet implemented by RegistryDecoder
+	std::shared_ptr<webrtc::AudioSourceInterface> GetAudio(
+			const std::string& url);
 
 	void RegistryDecoder(
 			webrtc::PeerConnectionFactoryInterface* peer_connection_factory,
 			const std::string url);
 private:
 	std::map<std::string, std::shared_ptr<webrtc::VideoSourceInterface> > videos_;
+	std::map<std::string, std::shared_ptr<webrtc::AudioSourceInterface> > audios_;
+	std::map<std::string, std::shared_ptr<GangDecoder> > decoders_;
 	GangVideoCapturerFactory video_capturer_factory_;
 };
 

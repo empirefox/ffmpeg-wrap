@@ -1,5 +1,6 @@
 #include "gangsources.h"
 #include "gangvideocapturerfactory.h"
+#include "gang_decoder.h"
 
 namespace gang {
 
@@ -16,43 +17,34 @@ std::shared_ptr<webrtc::VideoSourceInterface> GangSources::GetVideo(
 	return NULL;
 }
 
-void GangSources::RegistryVideo(
-		webrtc::PeerConnectionFactoryInterface* peer_connection_factory,
-		const std::string url) {
-	cricket::VideoCapturer* capturer = video_capturer_factory_.Create(
-			GangVideoCapturer::CreateGangVideoCapturerDevice(url));
-	if (capturer != NULL) {
-		videos_.insert(
-				std::make_pair(url,
-						std::shared_ptr<webrtc::VideoSourceInterface>(
-								peer_connection_factory->CreateVideoSource(
-										capturer,
-										NULL))));
+std::shared_ptr<webrtc::AudioSourceInterface> GangSources::GetAudio(
+		const std::string& url) {
+	std::map<std::string, std::shared_ptr<webrtc::AudioSourceInterface> >::iterator iter =
+			videos_.find(url);
+	if (iter != videos_.end()) {
+		return *iter;
 	}
+	return NULL;
 }
 
 void GangSources::RegistryDecoder(
 		webrtc::PeerConnectionFactoryInterface* peer_connection_factory,
 		const std::string url) {
 	//1 create decoder
+	std::shared_ptr<GangDecoder> decoder(new GangDecoder(url));
+	decoders_.insert(std::make_pair(url, decoder));
 
 	//2 registry video capturer
 
 	//2.1 create video capturer
-
-	//2.2 mount to decoder
-
-	//2.3 create source and insert to sources
-
-	//3 registry audio module
-
-	//3.1 create audio capturer
-
-	//3.2 mount to decoder
-
-	//3.3 create source and insert to sources
 	GangVideoCapturer* capturer = video_capturer_factory_.GangCreate(
 			GangVideoCapturer::CreateGangVideoCapturerDevice(url));
+	capturer->SetGangThread(decoder->signaling_thread());
+
+	//2.2 mount to decoder
+	decoder->SetVideoFrameObserver(capturer);
+
+	//2.3 create source and insert to sources
 	if (capturer != NULL) {
 		videos_.insert(
 				std::make_pair(url,
@@ -61,6 +53,14 @@ void GangSources::RegistryDecoder(
 										capturer,
 										NULL))));
 	}
+
+	//3 registry audio module if audio exists
+
+	//3.1 create audio capturer
+
+	//3.2 mount to decoder
+
+	//3.3 create source and insert to sources
 }
 
 // Detail: http://stackoverflow.com/a/13280852/2778814
@@ -71,14 +71,14 @@ static struct singleton_sources_class {
 
 	singleton_sources_class() {
 		if (count++ == 0) {
-			ptr = std::make_shared<GangSources>(new GangSources()); //initialization
+			ptr = std::make_shared<GangSources>(new GangSources); //initialization
 		}
 	}
 } singleton_sources;
 
 std::shared_ptr<GangSources> singleton_sources_class::ptr =
 		count == 0 ?
-				std::make_shared<GangSources>(new GangSources()) :
+				std::make_shared<GangSources>(new GangSources) :
 				move(singleton_sources_class::ptr);
 
 }  // namespace gang

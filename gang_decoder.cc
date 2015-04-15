@@ -3,15 +3,25 @@
 
 namespace gang {
 
+enum {
+	MSG_START_DECODE, MSG_STOP_DECODE,
+};
+
 GangDecoder::GangDecoder(const char* url,
 		VideoFrameObserver* video_frame_observer,
 		AudioFrameObserver* audio_frame_observer) :
 		decoder_(::new_gang_decoder(url)), video_frame_observer_(
 				video_frame_observer), audio_frame_observer_(
-				audio_frame_observer) {
+				audio_frame_observer), signaling_thread_(new rtc::Thread), worker_thread_(
+				new rtc::Thread), running_(false) {
+	signaling_thread_->Start();
+	// TODO should not start here, but after receiving MSG_START from signaling_thread
+	worker_thread_->Start();
 }
 
 GangDecoder::~GangDecoder() {
+	delete worker_thread_;
+	delete signaling_thread_;
 	::free_gang_decode(decoder_);
 }
 
@@ -55,6 +65,16 @@ void GangDecoder::NextFrameLoop() {
 	}
 }
 
+void GangDecoder::OnMessage(rtc::Message* msg) {
+	switch (msg->message_id) {
+	case MSG_START_DECODE:
+		// TODO
+		break;
+	default:
+		break;
+	}
+}
+
 void GangDecoder::SetVideoFrameObserver(
 		VideoFrameObserver* video_frame_observer) {
 	video_frame_observer_ = video_frame_observer;
@@ -63,6 +83,14 @@ void GangDecoder::SetVideoFrameObserver(
 void GangDecoder::SetAudioFrameObserver(
 		AudioFrameObserver* audio_frame_observer) {
 	audio_frame_observer_ = audio_frame_observer;
+}
+
+rtc::Thread* GangDecoder::signaling_thread() {
+	return signaling_thread_;
+}
+
+rtc::Thread* GangDecoder::worker_thread() {
+	return worker_thread_;
 }
 
 }  // namespace gang
