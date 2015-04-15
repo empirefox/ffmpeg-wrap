@@ -1,5 +1,4 @@
 #include "gangvideocapturerfactory.h"
-#include "gangvideocapturer.h"
 #include "webrtc/base/scoped_ptr.h"
 
 using namespace cricket;

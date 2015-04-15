@@ -3,6 +3,7 @@
 
 #include "webrtc/base/basictypes.h"
 #include "webrtc/base/constructormagic.h"
+#include "webrtc/base/criticalsection.h"
 #include "webrtc/base/thread.h"
 #include "talk/media/base/videocapturer.h"
 #include "gang_decoder.h"
@@ -31,7 +32,7 @@ protected:
 	}
 };
 
-class GangDecoder: public rtc::MessageHandler {
+class GangDecoder: public rtc::Thread, public rtc::MessageHandler {
 public:
 	explicit GangDecoder(const char* url,
 			VideoFrameObserver* video_frame_observer = NULL,
@@ -40,29 +41,27 @@ public:
 
 	bool Init();
 	bool Start();
-	void Stop();
+
+	virtual void Run() override;
+	virtual void Stop() override;
 
 	void NextFrameLoop();
 	virtual void OnMessage(rtc::Message* msg) override;
 
 	void SetVideoFrameObserver(VideoFrameObserver* video_frame_observer_);
 	void SetAudioFrameObserver(AudioFrameObserver* audio_frame_observer_);
-
-	rtc::Thread* signaling_thread();
-	rtc::Thread* worker_thread();
 private:
 	VideoFrameObserver* video_frame_observer_;
 	AudioFrameObserver* audio_frame_observer_;
 	gang_decoder* decoder_;
 
-	rtc::Thread* signaling_thread_;
-	rtc::Thread* worker_thread_;
-
+	mutable rtc::CriticalSection crit_;
 	bool running_;
 
 	DISALLOW_COPY_AND_ASSIGN(GangDecoder);
 };
 
-}  // namespace gang
+}
+// namespace gang
 
 #endif // GANG_GANG_DECODER_HH

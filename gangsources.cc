@@ -1,5 +1,4 @@
 #include "gangsources.h"
-#include "gangvideocapturerfactory.h"
 #include "gang_decoder.h"
 
 namespace gang {
@@ -39,7 +38,7 @@ void GangSources::RegistryDecoder(
 	//2.1 create video capturer
 	GangVideoCapturer* capturer = video_capturer_factory_.GangCreate(
 			GangVideoCapturer::CreateGangVideoCapturerDevice(url));
-	capturer->SetGangThread(decoder->signaling_thread());
+	capturer->SetGangThread(decoder.get());
 
 	//2.2 mount to decoder
 	decoder->SetVideoFrameObserver(capturer);

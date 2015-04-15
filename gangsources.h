@@ -5,6 +5,7 @@
 #include <memory>
 #include "talk/app/webrtc/videosourceinterface.h"
 #include "talk/app/webrtc/peerconnectioninterface.h"
+#include "gangvideocapturerfactory.h"
 #include "gangvideocapturer.h"
 
 namespace gang {

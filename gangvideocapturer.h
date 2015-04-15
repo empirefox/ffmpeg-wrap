@@ -45,7 +45,7 @@ public:
 		return false;
 	}
 
-	void SetGangThread(rtc::Thread* gang_thread);
+	void SetGangThread(GangDecoder* gang_thread);
 	// Implements VideoFrameObserver
 	virtual void OnVideoFrame(uint8* data, uint32 size);
 	virtual void OnBestFormat(int width, int height, int fps);
