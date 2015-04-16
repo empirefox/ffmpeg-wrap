@@ -16,7 +16,6 @@ class VideoFrameObserver {
 public:
 	// signal data
 	virtual void OnVideoFrame(uint8* data, uint32 size) = 0;
-	virtual void OnBestFormat(int width, int height, int fps) = 0;
 protected:
 	~VideoFrameObserver() {
 	}
@@ -48,6 +47,7 @@ public:
 
 	void SetVideoFrameObserver(VideoFrameObserver* video_frame_observer_);
 	void SetAudioFrameObserver(AudioFrameObserver* audio_frame_observer_);
+	void GetBestFormat(int* width, int* height, int* fps);
 private:
 	bool connect();
 	void disconnect();
@@ -57,6 +57,10 @@ private:
 
 	mutable rtc::CriticalSection crit_;
 	bool connected_;
+
+	int best_width_;
+	int best_height_;
+	int best_fps_;
 
 	DISALLOW_COPY_AND_ASSIGN(GangDecoder);
 };

@@ -5,16 +5,18 @@
 
 #include "talk/media/base/videocapturer.h"
 
-using namespace cricket;
+using cricket::VideoCapturer;
+using cricket::VideoFormat;
+using cricket::CaptureState;
+using cricket::CapturedFrame;
+using cricket::Device;
 
 namespace gang {
 
 // Simulated video capturer that reads frames from a url.
 class GangVideoCapturer: public VideoCapturer, public VideoFrameObserver {
 public:
-	static const int kForever = -1;
-
-	GangVideoCapturer();
+	GangVideoCapturer(const std::string& url);
 	virtual ~GangVideoCapturer();
 
 	// Determines if the given device is actually a video file, to be captured
@@ -24,18 +26,13 @@ public:
 	}
 
 	// Creates a fake device for the given filename.
-	static Device CreateGangVideoCapturerDevice(const std::string& filename) {
+	static Device CreateGangVideoCapturerDevice(const std::string& url) {
 		std::stringstream id;
-		id << kVideoGangDevicePrefix << filename;
-		return Device(filename, id.str());
+		id << kVideoGangDevicePrefix << url;
+		return Device(url, id.str());
 	}
 
-	// Initializes the capturer with the given file.
-	bool Init(const std::string& filename);
-
-	// Initializes the capturer with the given device. This should only be used
-	// if IsFileVideoCapturerDevice returned true for the given device.
-	bool Init(const Device& device);
+	void Init(GangDecoder* gang_thread);
 
 	// Override virtual methods of parent class VideoCapturer.
 	virtual CaptureState Start(const VideoFormat& capture_format);
@@ -45,10 +42,8 @@ public:
 		return false;
 	}
 
-	void SetGangThread(GangDecoder* gang_thread);
 	// Implements VideoFrameObserver
 	virtual void OnVideoFrame(uint8* data, uint32 size);
-	virtual void OnBestFormat(int width, int height, int fps);
 
 protected:
 	// Override virtual methods of parent class VideoCapturer.
@@ -65,10 +60,8 @@ private:
 
 	static const char* kVideoGangDevicePrefix;
 	CapturedFrame captured_frame_;
-	// The number of bytes allocated buffer for captured_frame_.data.
-	uint32 frame_buffer_size_;
 	int64 start_time_ns_;  // Time when the file video capturer starts.
-	rtc::Thread* gang_thread_;
+	GangDecoder* gang_thread_;
 
 	DISALLOW_COPY_AND_ASSIGN(GangVideoCapturer);
 };

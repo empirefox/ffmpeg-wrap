@@ -8,7 +8,8 @@ GangDecoder::GangDecoder(const char* url,
 		AudioFrameObserver* audio_frame_observer) :
 		decoder_(::new_gang_decoder(url)), video_frame_observer_(
 				video_frame_observer), audio_frame_observer_(
-				audio_frame_observer), connected_(false) {
+				audio_frame_observer), connected_(false), best_width_(640), best_height_(
+				480), best_fps_(30) {
 }
 
 GangDecoder::~GangDecoder() {
@@ -19,15 +20,17 @@ GangDecoder::~GangDecoder() {
 
 bool GangDecoder::Init() {
 	bool ok = false;
-	int* best_width;
-	int* best_height;
-	int* best_fps;
-	if (::init_gang_decoder(decoder_, best_width, best_height, best_fps) == 1) {
-		video_frame_observer_->OnBestFormat(*best_width, *best_height,
-				*best_fps);
+	if (::init_gang_decoder(decoder_, &best_width_, &best_height_, &best_fps_)
+			== 1) {
 		ok = true;
 	}
 	return ok;
+}
+
+void GangDecoder::GetBestFormat(int* width, int* height, int* fps) {
+	*width = best_width_;
+	*height = best_height_;
+	*fps = best_fps_;
 }
 
 void GangDecoder::Run() {

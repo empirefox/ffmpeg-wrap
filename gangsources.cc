@@ -38,10 +38,9 @@ void GangSources::RegistryDecoder(
 
 	//2 registry video capturer
 
-	//2.1 create video capturer
-	GangVideoCapturer* capturer = video_capturer_factory_.GangCreate(
-			GangVideoCapturer::CreateGangVideoCapturerDevice(url));
-	capturer->SetGangThread(decoder.get());
+	//2.1 create video capturer, capturer will be managed by peer connection
+	GangVideoCapturer* capturer = new GangVideoCapturer(url);
+	capturer->Init(decoder.get());
 
 	//2.2 mount to decoder
 	decoder->SetVideoFrameObserver(capturer);

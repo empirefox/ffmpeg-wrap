@@ -31,7 +31,6 @@ private:
 	std::map<std::string, std::shared_ptr<webrtc::VideoSourceInterface> > videos_;
 	std::map<std::string, std::shared_ptr<webrtc::AudioSourceInterface> > audios_;
 	std::map<std::string, std::shared_ptr<GangDecoder> > decoders_;
-	GangVideoCapturerFactory video_capturer_factory_;
 };
 
 }  // namespace gang
