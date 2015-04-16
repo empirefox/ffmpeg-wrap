@@ -32,7 +32,7 @@ protected:
 	}
 };
 
-class GangDecoder: public rtc::Thread, public rtc::MessageHandler {
+class GangDecoder: public rtc::Thread {
 public:
 	explicit GangDecoder(const char* url,
 			VideoFrameObserver* video_frame_observer = NULL,
@@ -40,23 +40,23 @@ public:
 	~GangDecoder();
 
 	bool Init();
-	bool Start();
 
 	virtual void Run() override;
-	virtual void Stop() override;
+	bool Connected();
 
-	void NextFrameLoop();
-	virtual void OnMessage(rtc::Message* msg) override;
+	bool NextFrameLoop();
 
 	void SetVideoFrameObserver(VideoFrameObserver* video_frame_observer_);
 	void SetAudioFrameObserver(AudioFrameObserver* audio_frame_observer_);
 private:
+	bool connect();
+	void disconnect();
 	VideoFrameObserver* video_frame_observer_;
 	AudioFrameObserver* audio_frame_observer_;
 	gang_decoder* decoder_;
 
 	mutable rtc::CriticalSection crit_;
-	bool running_;
+	bool connected_;
 
 	DISALLOW_COPY_AND_ASSIGN(GangDecoder);
 };

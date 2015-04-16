@@ -3,19 +3,17 @@
 
 namespace gang {
 
-enum {
-	MSG_START_DECODE, MSG_STOP_DECODE,
-};
-
 GangDecoder::GangDecoder(const char* url,
 		VideoFrameObserver* video_frame_observer,
 		AudioFrameObserver* audio_frame_observer) :
 		decoder_(::new_gang_decoder(url)), video_frame_observer_(
 				video_frame_observer), audio_frame_observer_(
-				audio_frame_observer), running_(false) {
+				audio_frame_observer), connected_(false) {
 }
 
 GangDecoder::~GangDecoder() {
+	disconnect();
+	Stop();
 	::free_gang_decode(decoder_);
 }
 
@@ -32,41 +30,59 @@ bool GangDecoder::Init() {
 	return ok;
 }
 
-bool GangDecoder::Start() {
-	return ::start_gang_decode(decoder_) == 1;
+void GangDecoder::Run() {
+	if (connect()) {
+		return;
+	}
+	while (connected_ && NextFrameLoop()) {
+	}
+	disconnect();
 }
 
-void GangDecoder::Stop() {
-	::stop_gang_decode(decoder_);
+bool GangDecoder::connect() {
+	rtc::CritScope cs(&crit_);
+	if (!connected_) {
+		connected_ = ::start_gang_decode(decoder_) == 0;
+	}
+	return connected_;
 }
 
-void GangDecoder::NextFrameLoop() {
+// Check if Run() is finished.
+bool GangDecoder::Connected() {
+	rtc::CritScope cs(&crit_);
+	return connected_;
+}
+
+void GangDecoder::disconnect() {
+	rtc::CritScope cs(&crit_);
+	if (connected_) {
+		::stop_gang_decode(decoder_);
+		connected_ = false;
+	}
+}
+
+bool GangDecoder::NextFrameLoop() {
+	bool is_eof = false;
 	uint8 **data;
 	int *size;
 	switch (::gang_decode_next_frame(decoder_, data, size)) {
 	case 1:
-		if (video_frame_observer_ != NULL)
+		if (video_frame_observer_)
 			video_frame_observer_->OnVideoFrame(reinterpret_cast<uint8*>(*data),
 					static_cast<uint32>(*size));
 		break;
 	case 2:
-		if (audio_frame_observer_ != NULL)
+		if (audio_frame_observer_)
 			audio_frame_observer_->OnAudioFrame(reinterpret_cast<uint8*>(*data),
 					static_cast<uint32>(*size));
 		break;
-	default:
-		break;
-	}
-}
-
-void GangDecoder::OnMessage(rtc::Message* msg) {
-	switch (msg->message_id) {
-	case MSG_START_DECODE:
-		// TODO
+	case -1:
+		is_eof = true;
 		break;
 	default:
 		break;
 	}
+	return is_eof;
 }
 
 void GangDecoder::SetVideoFrameObserver(

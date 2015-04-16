@@ -44,7 +44,7 @@ int start_gang_decode(struct gang_decoder* decoder);
 //
 // output: *data, need allocate and assign to **data.(do not free it)
 //         size
-// return: 0->error, 1->video, 2->audio
+// return: -1->EOF, 0->error, 1->video, 2->audio
 int gang_decode_next_frame(struct gang_decoder* decoder, uint8_t **data,
 		int *size);
 

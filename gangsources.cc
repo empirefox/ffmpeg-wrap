@@ -31,6 +31,9 @@ void GangSources::RegistryDecoder(
 		const std::string url) {
 	//1 create decoder
 	std::shared_ptr<GangDecoder> decoder(new GangDecoder(url));
+	if (!decoder->Init()) {
+		return;
+	}
 	decoders_.insert(std::make_pair(url, decoder));
 
 	//2 registry video capturer
