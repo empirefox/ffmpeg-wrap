@@ -1,27 +1,26 @@
 #include "gangsources.h"
-#include "gang_decoder.h"
 
 namespace gang {
 
 GangSources::GangSources() {
 }
 
-std::shared_ptr<webrtc::VideoSourceInterface> GangSources::GetVideo(
+rtc::scoped_refptr<webrtc::VideoSourceInterface> GangSources::GetVideo(
 		const std::string& url) {
-	std::map<std::string, std::shared_ptr<webrtc::VideoSourceInterface> >::iterator iter =
+	std::map<std::string, rtc::scoped_refptr<webrtc::VideoSourceInterface> >::iterator iter =
 			videos_.find(url);
 	if (iter != videos_.end()) {
-		return *iter;
+		return iter->second;
 	}
 	return NULL;
 }
 
-std::shared_ptr<webrtc::AudioSourceInterface> GangSources::GetAudio(
+rtc::scoped_refptr<webrtc::AudioSourceInterface> GangSources::GetAudio(
 		const std::string& url) {
-	std::map<std::string, std::shared_ptr<webrtc::AudioSourceInterface> >::iterator iter =
-			videos_.find(url);
-	if (iter != videos_.end()) {
-		return *iter;
+	std::map<std::string, rtc::scoped_refptr<webrtc::AudioSourceInterface> >::iterator iter =
+			audios_.find(url);
+	if (iter != audios_.end()) {
+		return iter->second;
 	}
 	return NULL;
 }
@@ -49,10 +48,8 @@ void GangSources::RegistryDecoder(
 	if (capturer != NULL) {
 		videos_.insert(
 				std::make_pair(url,
-						std::shared_ptr<webrtc::VideoSourceInterface>(
-								peer_connection_factory->CreateVideoSource(
-										capturer,
-										NULL))));
+						peer_connection_factory->CreateVideoSource(capturer,
+						NULL)));
 	}
 
 	//3 registry audio module if audio exists
@@ -72,14 +69,14 @@ static struct singleton_sources_class {
 
 	singleton_sources_class() {
 		if (count++ == 0) {
-			ptr = std::make_shared<GangSources>(new GangSources); //initialization
+			ptr = std::make_shared<GangSources>(); //initialization
 		}
 	}
 } singleton_sources;
 
 std::shared_ptr<GangSources> singleton_sources_class::ptr =
 		count == 0 ?
-				std::make_shared<GangSources>(new GangSources) :
+				std::make_shared<GangSources>() :
 				move(singleton_sources_class::ptr);
 
 }  // namespace gang

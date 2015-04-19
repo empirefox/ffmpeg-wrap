@@ -3,10 +3,10 @@
 
 namespace gang {
 
-GangDecoder::GangDecoder(const char* url,
+GangDecoder::GangDecoder(const std::string& url,
 		VideoFrameObserver* video_frame_observer,
 		AudioFrameObserver* audio_frame_observer) :
-		decoder_(::new_gang_decoder(url)), video_frame_observer_(
+		decoder_(::new_gang_decoder(url.c_str())), video_frame_observer_(
 				video_frame_observer), audio_frame_observer_(
 				audio_frame_observer), connected_(false), best_width_(640), best_height_(
 				480), best_fps_(30) {
@@ -66,18 +66,18 @@ void GangDecoder::disconnect() {
 
 bool GangDecoder::NextFrameLoop() {
 	bool is_eof = false;
-	uint8 **data;
-	int *size;
-	switch (::gang_decode_next_frame(decoder_, data, size)) {
+	uint8 *data = 0;
+	int size = 0;
+	switch (::gang_decode_next_frame(decoder_, &data, &size)) {
 	case 1:
 		if (video_frame_observer_)
-			video_frame_observer_->OnVideoFrame(reinterpret_cast<uint8*>(*data),
-					static_cast<uint32>(*size));
+			video_frame_observer_->OnVideoFrame(reinterpret_cast<uint8*>(data),
+					static_cast<uint32>(size));
 		break;
 	case 2:
 		if (audio_frame_observer_)
-			audio_frame_observer_->OnAudioFrame(reinterpret_cast<uint8*>(*data),
-					static_cast<uint32>(*size));
+			audio_frame_observer_->OnAudioFrame(reinterpret_cast<uint8*>(data),
+					static_cast<uint32>(size));
 		break;
 	case -1:
 		is_eof = true;

@@ -33,7 +33,7 @@ protected:
 
 class GangDecoder: public rtc::Thread {
 public:
-	explicit GangDecoder(const char* url,
+	explicit GangDecoder(const std::string& url,
 			VideoFrameObserver* video_frame_observer = NULL,
 			AudioFrameObserver* audio_frame_observer = NULL);
 	~GangDecoder();
@@ -51,9 +51,9 @@ public:
 private:
 	bool connect();
 	void disconnect();
+	gang_decoder* decoder_;
 	VideoFrameObserver* video_frame_observer_;
 	AudioFrameObserver* audio_frame_observer_;
-	gang_decoder* decoder_;
 
 	mutable rtc::CriticalSection crit_;
 	bool connected_;

@@ -4,6 +4,8 @@
 #include <string>
 
 #include "talk/media/base/videocapturer.h"
+#include "webrtc/base/stringutils.h"
+#include "gang_decoder.h"
 
 using cricket::VideoCapturer;
 using cricket::VideoFormat;
@@ -60,8 +62,8 @@ private:
 
 	static const char* kVideoGangDevicePrefix;
 	CapturedFrame captured_frame_;
-	int64 start_time_ns_;  // Time when the file video capturer starts.
 	GangDecoder* gang_thread_;
+	int64 start_time_ns_;  // Time when the file video capturer starts.
 
 	DISALLOW_COPY_AND_ASSIGN(GangVideoCapturer);
 };

@@ -9,10 +9,7 @@ VideoCapturer* GangVideoCapturerFactory::Create(const Device& device) {
 }
 
 GangVideoCapturer* GangVideoCapturerFactory::GangCreate(const Device& device) {
-	rtc::scoped_ptr<GangVideoCapturer> capturer(new GangVideoCapturer());
-	if (!capturer->Init(device)) {
-		return NULL;
-	}
+	rtc::scoped_ptr<GangVideoCapturer> capturer(new GangVideoCapturer(device.id));
 	return capturer.release();
 }
 
