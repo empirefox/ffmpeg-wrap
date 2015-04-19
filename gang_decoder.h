@@ -1,61 +1,71 @@
-#ifndef GANG_GANG_DECODER_H
-#define GANG_GANG_DECODER_H
-#ifdef __cplusplus
-extern "C" {
-#endif
-#include <stdint.h>
-#include <libavcodec/avcodec.h> 
-#include <libavformat/avformat.h> 
+#ifndef GANG_GANG_DECODER_HH
+#define GANG_GANG_DECODER_HH
 
-struct gang_decoder {
-	char* url;
-	int best_width;
-	int best_height;
-	int best_fps;
-	AVFormatContext *i_fmt_ctx;
+#include "webrtc/base/basictypes.h"
+#include "webrtc/base/constructormagic.h"
+#include "webrtc/base/criticalsection.h"
+#include "webrtc/base/thread.h"
+#include "talk/media/base/videocapturer.h"
+#include "gang_decoder.h"
+#include "gang_decoder_impl.h"
 
-	AVCodecContext* video_dec_ctx;
+namespace gang {
 
-	AVCodecContext* audio_dec_ctx;
-
-	unsigned video_stream_index;
-	unsigned audio_stream_index;
-
-	AVPacket i_pkt;
-
-	// and more
+// need be shared_ptr
+class VideoFrameObserver {
+public:
+	// signal data
+	virtual void OnVideoFrame(uint8* data, uint32 size) = 0;
+protected:
+	~VideoFrameObserver() {
+	}
 };
 
-struct gang_frame {
-	uint8_t* data;
-	int size;
-	int is_video;
-	int64_t pts;
-	int status;
+// need be shared_ptr
+class AudioFrameObserver {
+public:
+	// signal data
+	virtual void OnAudioFrame(uint8* data, uint32 size) = 0;
+protected:
+	~AudioFrameObserver() {
+	}
 };
 
-// create gang_decode with given url
-struct gang_decoder* new_gang_decoder(const char* url);
+class GangDecoder: public rtc::Thread {
+public:
+	explicit GangDecoder(const char* url,
+			VideoFrameObserver* video_frame_observer = NULL,
+			AudioFrameObserver* audio_frame_observer = NULL);
+	~GangDecoder();
 
-// get best format and store to struct
-int init_gang_decoder(struct gang_decoder* decoder_);
+	bool Init();
 
-// prepare AVCodecContext... and store to struct
-int start_gang_decode(struct gang_decoder* decoder_);
+	virtual void Run() override;
+	bool Connected();
 
-// read single frame, do not use allocate
-struct gang_frame* gang_decode_next_frame(struct gang_decoder* decoder_);
+	bool NextFrameLoop();
 
-void free_gang_frame(struct gang_frame* gang_decode_frame);
+	void SetVideoFrameObserver(VideoFrameObserver* video_frame_observer_);
+	void SetAudioFrameObserver(AudioFrameObserver* audio_frame_observer_);
+	void GetBestFormat(int* width, int* height, int* fps);
+private:
+	bool connect();
+	void disconnect();
+	VideoFrameObserver* video_frame_observer_;
+	AudioFrameObserver* audio_frame_observer_;
+	gang_decoder* decoder_;
 
-// disconnect from remote stream and free AVCodecContext...
-void stop_gang_decode(struct gang_decoder* decoder_);
+	mutable rtc::CriticalSection crit_;
+	bool connected_;
 
-// free gang_decoder
-void free_gang_decode(struct gang_decoder* decoder_);
+	int best_width_;
+	int best_height_;
+	int best_fps_;
 
-#ifdef __cplusplus
-} // closing brace for extern "C"
-#endif
+	DISALLOW_COPY_AND_ASSIGN(GangDecoder);
+};
 
-#endif // GANG_GANG_DECODER_H
+}
+// namespace gang
+
+#endif // GANG_GANG_DECODER_HH

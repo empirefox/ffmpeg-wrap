@@ -1,4 +1,4 @@
-#include "gang_decoder.h"
+#include "gang_decoder_impl.h"
 #include <stdio.h>
 
 int main(){
