@@ -64,15 +64,14 @@ void GangSources::RegistryDecoder(
 // Detail: http://stackoverflow.com/a/13280852/2778814
 // Technique covered in many texts.
 static int count = 0; // This gets implicitly initialized to 0 by the executable load into memory.
-static struct singleton_sources_class {
-	static std::shared_ptr<GangSources> ptr;
 
-	singleton_sources_class() {
-		if (count++ == 0) {
-			ptr = std::make_shared<GangSources>(); //initialization
-		}
+singleton_sources_class::singleton_sources_class() {
+	if (count++ == 0) {
+		ptr = std::make_shared<GangSources>(); //initialization
 	}
-} singleton_sources;
+}
+
+static struct singleton_sources_class singleton_sources;
 
 std::shared_ptr<GangSources> singleton_sources_class::ptr =
 		count == 0 ?

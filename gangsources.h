@@ -34,6 +34,11 @@ private:
 	std::map<std::string, std::shared_ptr<GangDecoder> > decoders_;
 };
 
+struct singleton_sources_class {
+	static std::shared_ptr<GangSources> ptr;
+	singleton_sources_class();
+};
+
 }  // namespace gang
 
 #endif // GANGSOURCES_H_
