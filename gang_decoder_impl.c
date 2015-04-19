@@ -14,9 +14,9 @@ static int decode_init(){
 struct gang_decoder* new_gang_decoder(const char* url){
 	struct gang_decoder * decoder = (struct gang_decoder*)malloc(sizeof(struct gang_decoder));
 	decoder->url = url;
-	decoder->best_width = 0;
-	decoder->best_height = 0;
-	decoder->best_fps = 20;
+	//decoder->best_width = 0;
+	//decoder->best_height = 0;
+	//decoder->best_fps = 20;
 	decoder->video_stream_index = -1;
 	decoder->audio_stream_index = -1;
 
@@ -27,7 +27,8 @@ struct gang_decoder* new_gang_decoder(const char* url){
 	return decoder;
 }
 
-int init_gang_decoder(struct gang_decoder* decoder_){
+int init_gang_decoder(struct gang_decoder* decoder, int* best_width, int* best_height, int* best_fps)
+{
 	if (decode_register_init == 0){
 		decode_init();
 	}
@@ -45,7 +46,7 @@ int init_gang_decoder(struct gang_decoder* decoder_){
 
 	i_fmt_ctx = avformat_alloc_context();
 
-	if (avformat_open_input(&i_fmt_ctx, decoder_->url, NULL, NULL) != 0)
+	if (avformat_open_input(&i_fmt_ctx, decoder->url, NULL, NULL) != 0)
 	{
 		fprintf(stderr, "could not open input file\n");
 		return -1;
@@ -77,8 +78,9 @@ int init_gang_decoder(struct gang_decoder* decoder_){
 		{
 			return 0;
 		}
-		decoder_->best_width = video_dec_ctx->width;
-		decoder_->best_height = video_dec_ctx->height;
+		*best_width = video_dec_ctx->width;
+		*best_height = video_dec_ctx->height;
+		*best_fps = 20;
 	}
 
 	avformat_close_input(&i_fmt_ctx);
@@ -142,102 +144,87 @@ int start_gang_decode(struct gang_decoder* decoder_){
 	return 1;
 }
 
-struct gang_frame* gang_decode_next_frame(struct gang_decoder* decoder_){
+int gang_decode_next_frame(struct gang_decoder* decoder, uint8_t **data, int *size){
 
-	
-	if (av_read_frame(decoder_->i_fmt_ctx, &decoder_->i_pkt) < 0){
+	if (av_read_frame(decoder->i_fmt_ctx, &decoder->i_pkt) < 0){
 		fprintf(stderr, "av_read_frame error!\n");
+		return 0;
 	}
 	AVFrame *pFrame = av_frame_alloc();
 	int got_picture = 0, ret = 0;
-	struct gang_frame*  gang_read_frame = (struct gang_frame*)malloc(sizeof(struct gang_frame));
-
+	
 	//video
-	if (decoder_->i_pkt.stream_index == decoder_->video_stream_index) {
+	if (decoder->i_pkt.stream_index == decoder->video_stream_index) {
 
-		avcodec_decode_video2(decoder_->video_dec_ctx, pFrame, &got_picture, &decoder_->i_pkt);
+		avcodec_decode_video2(decoder->video_dec_ctx, pFrame, &got_picture, &decoder->i_pkt);
 		if (got_picture) {
 
-			gang_read_frame->data = malloc(decoder_->video_dec_ctx->height * decoder_->video_dec_ctx->width * 3 / 2);
+			*data = malloc(decoder->video_dec_ctx->height * decoder->video_dec_ctx->width * 3 / 2);
 
-			memset(gang_read_frame->data, 0, decoder_->video_dec_ctx->height * decoder_->video_dec_ctx->width * 3 / 2);
+			memset(*data, 0, decoder->video_dec_ctx->height * decoder->video_dec_ctx->width * 3 / 2);
 
-			int height = decoder_->video_dec_ctx->height;
-			int width = decoder_->video_dec_ctx->width;
+			int height = decoder->video_dec_ctx->height;
+			int width = decoder->video_dec_ctx->width;
 			printf("decode video ok\n");
 			int a = 0, i;
 			for (i = 0; i<height; i++)
 			{
-				memcpy(gang_read_frame->data + a, pFrame->data[0] + i * pFrame->linesize[0], width);
+				memcpy(*data + a, pFrame->data[0] + i * pFrame->linesize[0], width);
 				a += width;
 			}
 			for (i = 0; i<height / 2; i++)
 			{
-				memcpy(gang_read_frame->data + a, pFrame->data[1] + i * pFrame->linesize[1], width / 2);
+				memcpy(*data + a, pFrame->data[1] + i * pFrame->linesize[1], width / 2);
 				a += width / 2;
 			}
 			for (i = 0; i<height / 2; i++)
 			{
-				memcpy(gang_read_frame->data + a, pFrame->data[2] + i * pFrame->linesize[2], width / 2);
+				memcpy(*data + a, pFrame->data[2] + i * pFrame->linesize[2], width / 2);
 				a += width / 2;
 			}
-			gang_read_frame->size = decoder_->i_pkt.size;
-			gang_read_frame->pts = decoder_->i_pkt.pts;
-			gang_read_frame->is_video = 1;
-			gang_read_frame->status = 1;
+			*size = decoder->i_pkt.size;
+			//*pts = decoder->i_pkt.pts;
+			ret = 1;
+			
 		}
 		else{
 			fprintf(stderr, "decode video frame error!\n");
-			gang_read_frame->data = NULL;
-			gang_read_frame->size = 0;
-			gang_read_frame->pts = 0;
-			gang_read_frame->is_video = 1;
-			gang_read_frame->status = 0;
-		
+			goto end;
 		}
 		
-	}else if (decoder_->i_pkt.stream_index == decoder_->audio_stream_index){
+	}
+	else if (decoder->i_pkt.stream_index == decoder->audio_stream_index){
 		//decode audio
-		avcodec_decode_audio4(decoder_->audio_dec_ctx, pFrame, &got_picture, &decoder_->i_pkt);
+		avcodec_decode_audio4(decoder->audio_dec_ctx, pFrame, &got_picture, &decoder->i_pkt);
 		if (got_picture) {
 			//fprintf(stderr, "decode one audio frame!\n");
-			gang_read_frame->data = (uint8_t*)malloc(decoder_->i_pkt.size);
-			memcpy(gang_read_frame->data, pFrame->data, decoder_->i_pkt.size);
+			*data = (uint8_t*)malloc(decoder->i_pkt.size);
+			memcpy(*data, pFrame->data, decoder->i_pkt.size);
 			
-			gang_read_frame->size = decoder_->i_pkt.size;
-			gang_read_frame->pts = decoder_->i_pkt.pts;
-			gang_read_frame->is_video = 0;
-			gang_read_frame->status = 1;
+			*size = decoder->i_pkt.size;
+			//*pts = decoder_->i_pkt.pts;
+			ret = 2;
+			
 		}
 		else{
 			fprintf(stderr, "decode audio frame error!\n");
-
-			gang_read_frame->data = NULL;
-			gang_read_frame->size = 0;
-			gang_read_frame->pts = 0;
-			gang_read_frame->is_video = 0;
-			gang_read_frame->status = 0;
+			goto end;
 		}
 	}
-	av_free_packet(&decoder_->i_pkt);
+	end:
+	av_free_packet(&decoder->i_pkt);
 	av_frame_free(&pFrame);
-	return gang_read_frame;
+	return ret;
 
 }
-void free_gang_frame(struct gang_frame* gang_decode_frame){
-	if (gang_decode_frame->data!=NULL)
-	free(gang_decode_frame->data);
-	if (gang_decode_frame != NULL){
-		free(gang_decode_frame);
-	}
-}
+
 // disconnect from remote stream and free AVCodecContext...
 void stop_gang_decode(struct gang_decoder* decoder_){
 	avformat_close_input(&decoder_->i_fmt_ctx);
 }
 
 // free gang_decoder
-void free_gang_decode(struct gang_decoder* decoder_){
-	free(decoder_);
+void free_gang_decode(struct gang_decoder* decoder){
+	free(decoder);
 }
 
