@@ -30,8 +30,7 @@ struct gang_decoder {
 struct gang_decoder* new_gang_decoder(const char* url);
 
 // get best format
-int init_gang_decoder(struct gang_decoder* decoder, int* best_width,
-		int* best_height, int* best_fps);
+int init_gang_decoder(struct gang_decoder* decoder, int* best_width, int* best_height, int* best_fps);
 
 // prepare AVCodecContext... and store to struct
 int start_gang_decode(struct gang_decoder* decoder);
@@ -45,8 +44,7 @@ int start_gang_decode(struct gang_decoder* decoder);
 // output: *data, need allocate and assign to **data.(do not free it)
 //         size
 // return: -1->EOF, 0->error, 1->video, 2->audio
-int gang_decode_next_frame(struct gang_decoder* decoder, uint8_t **data,
-		int *size);
+int gang_decode_next_frame(struct gang_decoder* decoder, uint8_t **data, int *size);
 
 // disconnect from remote stream and free AVCodecContext...
 void stop_gang_decode(struct gang_decoder* decoder);
