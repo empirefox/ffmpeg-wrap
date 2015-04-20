@@ -1,5 +1,6 @@
 #include  "gang_decoder.h"
 #include  "gang_decoder_impl.h"
+#include <iostream>
 
 namespace gang {
 
@@ -13,9 +14,13 @@ GangDecoder::GangDecoder(const std::string& url,
 }
 
 GangDecoder::~GangDecoder() {
-	disconnect();
 	Stop();
 	::free_gang_decode(decoder_);
+}
+
+void GangDecoder::Stop(){
+	disconnect();
+	rtc::Thread::Stop();
 }
 
 bool GangDecoder::Init() {
@@ -35,8 +40,10 @@ void GangDecoder::GetBestFormat(int* width, int* height, int* fps) {
 
 void GangDecoder::Run() {
 	if (connect()) {
+		printf("failed to run\n");
 		return;
 	}
+	printf("start to run\n");
 	while (connected_ && NextFrameLoop()) {
 	}
 	disconnect();
@@ -45,7 +52,9 @@ void GangDecoder::Run() {
 bool GangDecoder::connect() {
 	rtc::CritScope cs(&crit_);
 	if (!connected_) {
+		printf("::start_gang_decode start\n");
 		connected_ = ::start_gang_decode(decoder_) == 0;
+		printf("::start_gang_decode end\n");
 	}
 	return connected_;
 }
@@ -70,6 +79,7 @@ bool GangDecoder::NextFrameLoop() {
 	int size = 0;
 	switch (::gang_decode_next_frame(decoder_, &data, &size)) {
 	case 1:
+		std::cout << "data size: " << sizeof(data) / sizeof(uint8_t) << std::endl;
 		if (video_frame_observer_)
 			video_frame_observer_->OnVideoFrame(reinterpret_cast<uint8*>(data),
 					static_cast<uint32>(size));

@@ -41,6 +41,7 @@ public:
 	bool Init();
 
 	virtual void Run() override;
+	virtual void Stop() override;
 	bool Connected();
 
 	bool NextFrameLoop();
