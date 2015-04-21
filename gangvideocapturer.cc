@@ -11,6 +11,10 @@ GangVideoCapturer::GangVideoCapturer(const std::string& url) :
 }
 
 GangVideoCapturer::~GangVideoCapturer() {
+	if (gang_thread_) {
+		gang_thread_->Stop();
+		gang_thread_ = NULL;
+	}
 	Stop();
 	delete[] static_cast<uint8*>(captured_frame_.data);
 }
@@ -59,10 +63,6 @@ CaptureState GangVideoCapturer::Start(const VideoFormat& capture_format) {
 }
 
 void GangVideoCapturer::Stop() {
-	if (gang_thread_) {
-		gang_thread_ = NULL;
-		// TODO Stop gang_thread_?
-	}
 	SetCaptureFormat(NULL);
 }
 

@@ -2,6 +2,7 @@
 #include <stdio.h>
 
 int main(){
+	printf("url: \n");
 	int res;
 	int i = 0;
 	int width = 0;
@@ -32,7 +33,7 @@ int main(){
 		printf("start error");
 	}
 
-	while (i<1000){
+	while (i<100){
 		res = gang_decode_next_frame(decode, data, size);
 		printf("=================read data==============\n");
 		printf("size %d\n", *size);

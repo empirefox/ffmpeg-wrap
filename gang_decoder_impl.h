@@ -12,6 +12,15 @@ extern "C" {
 struct gang_decoder {
 	char* url;
 
+	int width;
+	int height;
+	int fps;
+	enum AVPixelFormat pix_fmt;
+
+	 uint8_t *video_dst_data[4];
+	 int      video_dst_linesize[4];
+	 int video_dst_bufsize;
+
 	AVFormatContext *i_fmt_ctx;
 
 	AVCodecContext* video_dec_ctx;
@@ -30,7 +39,7 @@ struct gang_decoder {
 struct gang_decoder* new_gang_decoder(const char* url);
 
 // get best format
-int init_gang_decoder(struct gang_decoder* decoder, int* best_width, int* best_height, int* best_fps);
+int init_gang_decoder(struct gang_decoder* decoder);
 
 // prepare AVCodecContext... and store to struct
 int start_gang_decode(struct gang_decoder* decoder);

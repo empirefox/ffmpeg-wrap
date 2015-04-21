@@ -15,6 +15,7 @@ namespace gang {
 class VideoFrameObserver {
 public:
 	// signal data
+	// see "talk/media/webrtc/webrtcvideoframe.h"
 	virtual void OnVideoFrame(uint8* data, uint32 size) = 0;
 protected:
 	~VideoFrameObserver() {
@@ -58,10 +59,6 @@ private:
 
 	mutable rtc::CriticalSection crit_;
 	bool connected_;
-
-	int best_width_;
-	int best_height_;
-	int best_fps_;
 
 	DISALLOW_COPY_AND_ASSIGN(GangDecoder);
 };

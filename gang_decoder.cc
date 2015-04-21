@@ -1,6 +1,7 @@
 #include  "gang_decoder.h"
 #include  "gang_decoder_impl.h"
 #include <iostream>
+#include <stdio.h>
 
 namespace gang {
 
@@ -9,43 +10,44 @@ GangDecoder::GangDecoder(const std::string& url,
 		AudioFrameObserver* audio_frame_observer) :
 		decoder_(::new_gang_decoder(url.c_str())), video_frame_observer_(
 				video_frame_observer), audio_frame_observer_(
-				audio_frame_observer), connected_(false), best_width_(640), best_height_(
-				480), best_fps_(30) {
+				audio_frame_observer), connected_(false) {
 }
 
 GangDecoder::~GangDecoder() {
+	printf("GangDecoder::~GangDecoder\n");
 	Stop();
 	::free_gang_decode(decoder_);
 }
 
-void GangDecoder::Stop(){
+void GangDecoder::Stop() {
+	printf("GangDecoder::Stop\n");
 	disconnect();
 	rtc::Thread::Stop();
 }
 
 bool GangDecoder::Init() {
-	bool ok = false;
-	if (::init_gang_decoder(decoder_, &best_width_, &best_height_, &best_fps_)
-			== 1) {
-		ok = true;
+	if (::init_gang_decoder(decoder_) == 1) {
+		return true;
 	}
-	return ok;
+	return false;
 }
 
 void GangDecoder::GetBestFormat(int* width, int* height, int* fps) {
-	*width = best_width_;
-	*height = best_height_;
-	*fps = best_fps_;
+	*width = decoder_->width;
+	*height = decoder_->height;
+	*fps = decoder_->fps;
 }
 
 void GangDecoder::Run() {
-	if (connect()) {
+	if (!connect()) {
 		printf("failed to run\n");
 		return;
 	}
 	printf("start to run\n");
-	while (connected_ && NextFrameLoop()) {
+	while (connected_ && !NextFrameLoop()) {
+//		printf("running \n");
 	}
+	printf("stopping %s\n", connected_);
 	disconnect();
 }
 
@@ -53,7 +55,7 @@ bool GangDecoder::connect() {
 	rtc::CritScope cs(&crit_);
 	if (!connected_) {
 		printf("::start_gang_decode start\n");
-		connected_ = ::start_gang_decode(decoder_) == 0;
+		connected_ = ::start_gang_decode(decoder_) == 1;
 		printf("::start_gang_decode end\n");
 	}
 	return connected_;
@@ -74,14 +76,13 @@ void GangDecoder::disconnect() {
 }
 
 bool GangDecoder::NextFrameLoop() {
-	bool is_eof = false;
-	uint8 *data = 0;
+	uint8_t *data = 0;
 	int size = 0;
 	switch (::gang_decode_next_frame(decoder_, &data, &size)) {
 	case 1:
-		std::cout << "data size: " << sizeof(data) / sizeof(uint8_t) << std::endl;
+		std::cout << "data size: " << size << std::endl;
 		if (video_frame_observer_)
-			video_frame_observer_->OnVideoFrame(reinterpret_cast<uint8*>(data),
+			video_frame_observer_->OnVideoFrame(static_cast<uint8*>(data),
 					static_cast<uint32>(size));
 		break;
 	case 2:
@@ -90,12 +91,12 @@ bool GangDecoder::NextFrameLoop() {
 					static_cast<uint32>(size));
 		break;
 	case -1:
-		is_eof = true;
-		break;
+		printf("EOF\n");
+		return true;
 	default:
 		break;
 	}
-	return is_eof;
+	return false;
 }
 
 void GangDecoder::SetVideoFrameObserver(
