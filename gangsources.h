@@ -22,7 +22,7 @@ public:
 			const std::string& url);
 
 	// TODO not yet implemented by RegistryDecoder
-	rtc::scoped_refptr<webrtc::AudioSourceInterface> GetAudio(
+	std::shared_ptr<GangDecoder> GetDecoder(
 			const std::string& url);
 
 	void RegistryDecoder(

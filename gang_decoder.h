@@ -14,9 +14,9 @@ namespace gang {
 // need be shared_ptr
 class VideoFrameObserver {
 public:
-	// signal data
+	// signal data uint8*
 	// see "talk/media/webrtc/webrtcvideoframe.h"
-	virtual void OnVideoFrame(uint8* data, uint32 size) = 0;
+	virtual void OnVideoFrame(void* data, uint32 size) = 0;
 protected:
 	~VideoFrameObserver() {
 	}
@@ -25,8 +25,8 @@ protected:
 // need be shared_ptr
 class AudioFrameObserver {
 public:
-	// signal data
-	virtual void OnAudioFrame(uint8* data, uint32 size) = 0;
+	// signal data int16_t*
+	virtual void OnAudioFrame(void* data, uint32_t nSamples) = 0;
 protected:
 	~AudioFrameObserver() {
 	}
@@ -34,7 +34,8 @@ protected:
 
 class GangDecoder: public rtc::Thread {
 public:
-	explicit GangDecoder(const std::string& url,
+	explicit GangDecoder(
+			const std::string& url,
 			VideoFrameObserver* video_frame_observer = NULL,
 			AudioFrameObserver* audio_frame_observer = NULL);
 	~GangDecoder();
@@ -49,7 +50,9 @@ public:
 
 	void SetVideoFrameObserver(VideoFrameObserver* video_frame_observer_);
 	void SetAudioFrameObserver(AudioFrameObserver* audio_frame_observer_);
+	// TODO change to GetVideoInfo
 	void GetBestFormat(int* width, int* height, int* fps);
+	void GetAudioInfo(int* sample_rate, int* channels, int* bytesPerSample);
 private:
 	bool connect();
 	void disconnect();

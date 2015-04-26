@@ -70,10 +70,10 @@ bool GangVideoCapturer::IsRunning() {
 	return gang_thread_ && gang_thread_->Connected();
 }
 
-void GangVideoCapturer::OnVideoFrame(uint8* data, uint32 size) {
+void GangVideoCapturer::OnVideoFrame(void* data, uint32 size) {
 	uint32 start_read_time_ms = rtc::Time();
 	captured_frame_.data_size = size;
-	captured_frame_.data = reinterpret_cast<void*>(data);
+	captured_frame_.data = data;
 
 	captured_frame_.time_stamp = kNumNanoSecsPerMilliSec
 			* static_cast<int64>(start_read_time_ms);

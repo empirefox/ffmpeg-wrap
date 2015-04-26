@@ -15,11 +15,11 @@ rtc::scoped_refptr<webrtc::VideoSourceInterface> GangSources::GetVideo(
 	return NULL;
 }
 
-rtc::scoped_refptr<webrtc::AudioSourceInterface> GangSources::GetAudio(
+std::shared_ptr<GangDecoder> GangSources::GetDecoder(
 		const std::string& url) {
-	std::map<std::string, rtc::scoped_refptr<webrtc::AudioSourceInterface> >::iterator iter =
-			audios_.find(url);
-	if (iter != audios_.end()) {
+	std::map<std::string, std::shared_ptr<GangDecoder> >::iterator iter =
+			decoders_.find(url);
+	if (iter != decoders_.end()) {
 		return iter->second;
 	}
 	return NULL;

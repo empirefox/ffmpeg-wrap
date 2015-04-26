@@ -12,10 +12,16 @@ extern "C" {
 struct gang_decoder {
 	char* url;
 
+	//vidio
 	int width;
 	int height;
 	int fps;
 	enum AVPixelFormat pix_fmt;
+	// audio
+
+	int sample_rate;
+	int channels;
+	int bytesPerSample;
 
 	 uint8_t *video_dst_data[4];
 	 int      video_dst_linesize[4];
@@ -53,7 +59,7 @@ int start_gang_decode(struct gang_decoder* decoder);
 // output: *data, need allocate and assign to **data.(do not free it)
 //         size
 // return: -1->EOF, 0->error, 1->video, 2->audio
-int gang_decode_next_frame(struct gang_decoder* decoder, uint8_t **data, int *size);
+int gang_decode_next_frame(struct gang_decoder* decoder, void **data, int *size);
 
 // disconnect from remote stream and free AVCodecContext...
 void stop_gang_decode(struct gang_decoder* decoder);

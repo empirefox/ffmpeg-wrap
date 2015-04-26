@@ -38,25 +38,25 @@ void GangDecoder::GetBestFormat(int* width, int* height, int* fps) {
 	*fps = decoder_->fps;
 }
 
+void GangDecoder::GetAudioInfo(int* sample_rate, int* channels, int* bytesPerSample){
+	*sample_rate = decoder_->sample_rate;
+	*channels = decoder_->channels;
+	*bytesPerSample = decoder_->bytesPerSample;
+}
+
 void GangDecoder::Run() {
 	if (!connect()) {
-		printf("failed to run\n");
 		return;
 	}
-	printf("start to run\n");
 	while (connected_ && !NextFrameLoop()) {
-//		printf("running \n");
 	}
-	printf("stopping %s\n", connected_);
 	disconnect();
 }
 
 bool GangDecoder::connect() {
 	rtc::CritScope cs(&crit_);
 	if (!connected_) {
-		printf("::start_gang_decode start\n");
 		connected_ = ::start_gang_decode(decoder_) == 1;
-		printf("::start_gang_decode end\n");
 	}
 	return connected_;
 }
@@ -76,19 +76,21 @@ void GangDecoder::disconnect() {
 }
 
 bool GangDecoder::NextFrameLoop() {
-	uint8_t *data = 0;
+	void *data = 0;
+	// nSamples
 	int size = 0;
 	switch (::gang_decode_next_frame(decoder_, &data, &size)) {
 	case 1:
-		std::cout << "data size: " << size << std::endl;
 		if (video_frame_observer_)
-			video_frame_observer_->OnVideoFrame(static_cast<uint8*>(data),
+			video_frame_observer_->OnVideoFrame(data,
 					static_cast<uint32>(size));
 		break;
 	case 2:
 		if (audio_frame_observer_)
-			audio_frame_observer_->OnAudioFrame(reinterpret_cast<uint8*>(data),
-					static_cast<uint32>(size));
+			audio_frame_observer_->OnAudioFrame(data,
+					static_cast<uint32_t>(size));
+		else
+			free(data);
 		break;
 	case -1:
 		printf("EOF\n");

@@ -45,7 +45,8 @@ public:
 	}
 
 	// Implements VideoFrameObserver
-	virtual void OnVideoFrame(uint8* data, uint32 size);
+	// data uint8*
+	virtual void OnVideoFrame(void* data, uint32 size);
 
 protected:
 	// Override virtual methods of parent class VideoCapturer.
