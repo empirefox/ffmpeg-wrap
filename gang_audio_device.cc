@@ -40,6 +40,10 @@ GangAudioDevice::GangAudioDevice() :
 				channels_(0),
 				bytesPerSample_(0),
 				sample_rate_(0),
+				rec_send_buff_(NULL),
+				rec_rest_buff_(NULL),
+				rec_rest_buff_size_(0),
+				len_bytes_10ms_(0),
 				rec_worker_thread_(new rtc::Thread) {
 	rec_worker_thread_->Start();
 	printf("GangAudioDevice\n");
@@ -54,6 +58,7 @@ GangAudioDevice::~GangAudioDevice() {
 	if (rec_worker_thread_) {
 		rec_worker_thread_->Clear(this);
 		rec_worker_thread_->Stop();
+		delete rec_worker_thread_;
 		rec_worker_thread_ = NULL;
 	}
 }
@@ -248,6 +253,11 @@ int32_t GangAudioDevice::StartRecording() {
 			sample_rate_,
 			channels_,
 			bytesPerSample_);
+
+	// init rec_rest_buff_ 10ms container
+	len_bytes_10ms_ = sample_rate_ * channels_ / 100;
+	rec_send_buff_ = new uint8_t[len_bytes_10ms_];
+	rec_rest_buff_ = new uint8_t[len_bytes_10ms_];
 	return 0;
 }
 
@@ -256,7 +266,18 @@ int32_t GangAudioDevice::StopRecording() {
 	printf("GangAudioDevice::StopRecording()\n");
 	rtc::CritScope cs(&crit_);
 	recording_ = false;
-	decoder_->SetAudioFrameObserver(NULL);
+	if (decoder_) {
+		decoder_->SetAudioFrameObserver(NULL);
+	}
+	rec_rest_buff_size_ = 0;
+	if (rec_send_buff_) {
+		delete[] rec_send_buff_;
+		rec_send_buff_ = NULL;
+	}
+	if (rec_rest_buff_) {
+		delete[] rec_rest_buff_;
+		rec_rest_buff_ = NULL;
+	}
 	return 0;
 }
 
@@ -649,22 +670,43 @@ void GangAudioDevice::OnMessage(rtc::Message* msg) {
 		uint32_t current_mic_level = 0;
 		MicrophoneVolume(&current_mic_level);
 		SampleData* msg_data = static_cast<SampleData*>(msg->pdata);
-		printf("GangAudioDevice::OnMessage(), nSamples:%d\n", msg_data->nSamples_);
+		printf(
+				"GangAudioDevice::OnMessage(), nSamples:%d\n",
+				msg_data->nSamples_);
+		uint8_t* data = reinterpret_cast<uint8_t*>(msg_data->data_);
 
-		int32_t ret = audio_callback_->RecordedDataIsAvailable(
-				msg_data->data_,
-				msg_data->nSamples_,
-				bytesPerSample_,
-				1,
-				44000,
-				kTotalDelayMs,
-				kClockDriftMs,
-				current_mic_level,
-				key_pressed,
-				current_mic_level);
+		uint32_t total_index = 0;
+		int to_index = rec_rest_buff_size_;
+		do {
+			rec_send_buff_[to_index] = data[total_index];
+			++total_index;
+			++to_index;
+			if (to_index == len_bytes_10ms_) {
+				to_index = 0;
 
-		printf("GangAudioDevice::OnMessage(), return:%d\n", ret);
-		SetMicrophoneVolume(current_mic_level);
+				int32_t ret = audio_callback_->RecordedDataIsAvailable(
+						rec_send_buff_,
+						len_bytes_10ms_,
+						bytesPerSample_,
+						channels_,
+						sample_rate_,
+						kTotalDelayMs,
+						kClockDriftMs,
+						current_mic_level,
+						key_pressed,
+						current_mic_level);
+				if (ret != 0)
+					printf("GangAudioDevice::OnMessage(), return:%d\n", ret);
+
+				SetMicrophoneVolume(current_mic_level);
+			}
+		} while (total_index < msg_data->nSamples_);
+
+		rec_rest_buff_size_ = to_index;
+
+		free(data);
+		delete msg_data;
+
 		break;
 	}
 }

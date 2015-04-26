@@ -62,6 +62,8 @@ private:
 
 	mutable rtc::CriticalSection crit_;
 	bool connected_;
+	int escape_;
+	int escaped_;
 
 	DISALLOW_COPY_AND_ASSIGN(GangDecoder);
 };

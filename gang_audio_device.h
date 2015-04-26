@@ -240,6 +240,10 @@ private:
 	int channels_;
 	int bytesPerSample_;
 	int sample_rate_;
+	uint8_t* rec_send_buff_;
+	uint8_t* rec_rest_buff_;
+	int rec_rest_buff_size_;
+	int len_bytes_10ms_;
 
 	rtc::Thread* rec_worker_thread_;
 

@@ -137,6 +137,9 @@ int init_gang_decoder(struct gang_decoder* decoder) {
 		printf("fmt: %s\n", fmt);
 		printf("channels: %d\n", decoder->channels);
 		printf("sample_rate: %d\n", decoder->sample_rate);
+
+		// TODO for test
+		decoder->channels = 1;
 	}
 
 	avformat_close_input(&i_fmt_ctx);
@@ -270,8 +273,8 @@ int gang_decode_next_frame(struct gang_decoder* decoder, void **data, int *size)
 		}
 
 		if (got_picture) {
-			size_t unpadded_linesize = 440
-					* decoder->bytesPerSample;
+			size_t unpadded_linesize = pFrame->nb_samples
+					* decoder->bytesPerSample * decoder->channels;
 			if (unpadded_linesize < 1) {
 				fprintf(stderr, "decode audio frame error! length < 1\n");
 				goto end;
@@ -286,15 +289,11 @@ int gang_decode_next_frame(struct gang_decoder* decoder, void **data, int *size)
 			 * You should use libswresample or libavfilter to convert the frame
 			 * to packed data. */
 
-			int16_t* tmp = (int16_t*) malloc(unpadded_linesize);
-//			memcpy(tmp, pFrame->extended_data[0], unpadded_linesize);
-
-			for (int i = 0; i < 440; ++i) {
-				tmp[i] = 10000;
-			}
+			uint8_t* tmp = (uint8_t*) malloc(unpadded_linesize);
+			memcpy(tmp, pFrame->extended_data[0], unpadded_linesize);
 
 			*data = tmp;
-			*size = 440;
+			*size = pFrame->nb_samples;
 			//*pts = decoder_->i_pkt.pts;
 			ret = 2;
 

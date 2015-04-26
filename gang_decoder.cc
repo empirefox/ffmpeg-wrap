@@ -5,12 +5,16 @@
 
 namespace gang {
 
-GangDecoder::GangDecoder(const std::string& url,
+GangDecoder::GangDecoder(
+		const std::string& url,
 		VideoFrameObserver* video_frame_observer,
 		AudioFrameObserver* audio_frame_observer) :
-		decoder_(::new_gang_decoder(url.c_str())), video_frame_observer_(
-				video_frame_observer), audio_frame_observer_(
-				audio_frame_observer), connected_(false) {
+				decoder_(::new_gang_decoder(url.c_str())),
+				video_frame_observer_(video_frame_observer),
+				audio_frame_observer_(audio_frame_observer),
+				connected_(false),
+				escape_(100),
+				escaped_(0) {
 }
 
 GangDecoder::~GangDecoder() {
@@ -38,7 +42,10 @@ void GangDecoder::GetBestFormat(int* width, int* height, int* fps) {
 	*fps = decoder_->fps;
 }
 
-void GangDecoder::GetAudioInfo(int* sample_rate, int* channels, int* bytesPerSample){
+void GangDecoder::GetAudioInfo(
+		int* sample_rate,
+		int* channels,
+		int* bytesPerSample) {
 	*sample_rate = decoder_->sample_rate;
 	*channels = decoder_->channels;
 	*bytesPerSample = decoder_->bytesPerSample;
@@ -82,14 +89,21 @@ bool GangDecoder::NextFrameLoop() {
 	switch (::gang_decode_next_frame(decoder_, &data, &size)) {
 	case 1:
 		if (video_frame_observer_)
-			video_frame_observer_->OnVideoFrame(data,
+			video_frame_observer_->OnVideoFrame(
+					data,
 					static_cast<uint32>(size));
 		break;
 	case 2:
-		if (audio_frame_observer_)
-			audio_frame_observer_->OnAudioFrame(data,
-					static_cast<uint32_t>(size));
-		else
+		if (audio_frame_observer_) {
+			++escaped_;
+			if (escaped_ > escape_){
+				audio_frame_observer_->OnAudioFrame(
+						data,
+						static_cast<uint32_t>(size));
+			}else {
+				free(data);
+			}
+		} else
 			free(data);
 		break;
 	case -1:
