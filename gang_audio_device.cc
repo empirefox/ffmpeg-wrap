@@ -680,21 +680,20 @@ int32_t GangAudioDevice::DeliverRecordedData() {
 //  16-bit,48kHz mono,  10ms => nSamples=480 => _recSize=2*480=960 bytes
 //  16-bit,48kHz stereo,10ms => nSamples=480 => _recSize=4*480=1920 bytes
 // ----------------------------------------------------------------------------
-void GangAudioDevice::OnRecData(SampleData* msg_data) {
-	int8_t* data = reinterpret_cast<int8_t*>(msg_data->data_);
+void GangAudioDevice::OnRecData(int8_t* data, uint32_t nSamples) {
 
-	uint32_t nb_src_bytes = msg_data->nSamples_ * _recBytesPerSample;
+	uint32_t nb_src_bytes = nSamples * _recBytesPerSample;
 	uint32_t src_index = 0;
 
-	CriticalSectionScoped lock(&_critSectCb);
 	// Ensure that user has initialized all essential members
 	if ((_recSampleRate == 0) || (nb_src_bytes == 0) || (_recChannels == 0)) {
-		goto end;
+		return;
 	}
 
 	if (AudioDeviceModule::kChannelRight == _recChannel) {
 		++src_index;
 	}
+
 	do {
 		rec_buff_[rec_buff_index_] = data[src_index];
 		++rec_buff_index_;
@@ -708,15 +707,18 @@ void GangAudioDevice::OnRecData(SampleData* msg_data) {
 			DeliverRecordedData();
 		}
 	} while (src_index < nb_src_bytes);
-
-	end: free(data);
-	delete msg_data;
 }
 
 void GangAudioDevice::OnMessage(rtc::Message* msg) {
 	switch (msg->message_id) {
 	case MSG_REC_DATA:
-		OnRecData(static_cast<SampleData*>(msg->pdata));
+		CriticalSectionScoped lock(&_critSectCb);
+		SampleData* msg_data = static_cast<SampleData*>(msg->pdata);
+		int8_t* data = reinterpret_cast<int8_t*>(msg_data->data_);
+		uint32_t nSamples = msg_data->nSamples_;
+		OnRecData(data, nSamples);
+		free(data);
+		delete msg_data;
 		break;
 	}
 }

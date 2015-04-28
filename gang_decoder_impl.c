@@ -62,6 +62,7 @@ struct gang_decoder* new_gang_decoder(const char* url) {
 	decoder->url = url;
 	decoder->video_stream_index = -1;
 	decoder->audio_stream_index = -1;
+	decoder->is_audio_planar_ = 0;
 
 	decoder->i_fmt_ctx = NULL;
 	decoder->video_dec_ctx = NULL;
@@ -140,13 +141,14 @@ int init_gang_decoder(struct gang_decoder* decoder) {
 							"(%s). This example will output the first channel only.\n",
 					packed ? packed : "?");
 			sfmt = av_get_packed_sample_fmt(sfmt);
-			decoder->channels = 1;
+			decoder->is_audio_planar_ = 1;
 		}
 
 		if ((get_format_from_sample_fmt(&fmt, sfmt)) < 0)
 			printf("get_format_from_sample_fmt < 0");
 
 		decoder->channels = audio_dec_ctx->channels;
+//		decoder->channels = 1;
 		decoder->sample_rate = audio_dec_ctx->sample_rate;
 		decoder->bytesPerSample = av_get_bytes_per_sample(
 				audio_dec_ctx->sample_fmt);
@@ -307,7 +309,21 @@ int gang_decode_next_frame(struct gang_decoder* decoder, void **data, int *size)
 			 * to packed data. */
 
 			uint8_t* tmp = (uint8_t*) malloc(unpadded_linesize);
-			memcpy(tmp, pFrame->extended_data[0], unpadded_linesize);
+			if (decoder->is_audio_planar_) {
+				int i, ch;
+				uint8_t* t = tmp;
+				for (i = 0; i < pFrame->nb_samples; i++) {
+					for (ch = 0; ch < decoder->channels; ++ch) {
+						memcpy(
+								t,
+								pFrame->data[ch] + decoder->bytesPerSample * i,
+								decoder->bytesPerSample);
+						t += decoder->bytesPerSample;
+					}
+				}
+			} else {
+				memcpy(tmp, pFrame->extended_data[0], unpadded_linesize);
+			}
 
 			*data = tmp;
 			*size = pFrame->nb_samples;

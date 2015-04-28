@@ -202,7 +202,7 @@ public:
 
 	int32_t DeliverRecordedData();
 
-	void OnRecData(SampleData* msg_data);
+	void OnRecData(int8_t* data, uint32_t nSamples);
 
 	virtual void OnMessage(rtc::Message* msg) override;
 

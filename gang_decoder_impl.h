@@ -22,6 +22,7 @@ struct gang_decoder {
 	uint32_t sample_rate;
 	uint8_t channels;
 	int8_t bytesPerSample;
+	int is_audio_planar_;
 
 	uint8_t *video_dst_data[4];
 	int video_dst_linesize[4];
