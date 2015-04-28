@@ -2,11 +2,11 @@
 #define GANG_AUDIO_DEVICE_H
 
 #include "webrtc/base/basictypes.h"
-#include "webrtc/base/criticalsection.h"
 #include "webrtc/base/messagehandler.h"
 #include "webrtc/base/scoped_ref_ptr.h"
 #include "webrtc/common_types.h"
 #include "webrtc/modules/audio_device/include/audio_device.h"
+#include "webrtc/system_wrappers/interface/critical_section_wrapper.h"
 #include "gang_decoder.h"
 
 namespace rtc {
@@ -18,11 +18,14 @@ class Thread;
 using webrtc::AudioDeviceModule;
 using webrtc::AudioTransport;
 using webrtc::AudioDeviceObserver;
+using webrtc::CriticalSectionWrapper;
 using webrtc::kAdmMaxDeviceNameSize;
 using webrtc::kAdmMaxFileNameSize;
 using webrtc::kAdmMaxGuidSize;
 
 namespace gang {
+
+const uint32_t kMaxBufferSizeBytes = 3840; // 10ms in stereo @ 96kHz
 
 class GangAudioDevice: public AudioDeviceModule,
 		public AudioFrameObserver,
@@ -197,6 +200,10 @@ public:
 	// End of functions inherited from webrtc::AudioDeviceModule.
 	bool Initialize(GangDecoder* decoder);
 
+	int32_t SetRecordedBuffer(const void* audioBuffer, uint32_t nSamples);
+
+	int32_t DeliverRecordedData();
+
 	virtual void OnMessage(rtc::Message* msg) override;
 
 	virtual void OnAudioFrame(void* data, uint32_t nSamples) override;
@@ -225,35 +232,42 @@ private:
 
 	bool rec_is_initialized_; // True when the instance is ready to push audio.
 
-	// Input to and output from RecordedDataIsAvailable(..) makes it possible to
-	// modify the current mic level. The implementation does not care about the
-	// mic level so it just feeds back what it receives.
-	uint32_t current_mic_level_;
-
-	// next_frame_time_ is updated in a non-drifting manner to indicate the next
-	// wall clock time the next frame should be generated and received. started_
-	// ensures that next_frame_time_ can be initialized properly on first call.
-	bool started_;
-
 	// User provided thread context.
 	GangDecoder* decoder_;
-	int channels_;
-	int bytesPerSample_;
-	int sample_rate_;
-	uint8_t* rec_send_buff_;
-	uint8_t* rec_rest_buff_;
-	int rec_rest_buff_size_;
-	int len_bytes_10ms_;
+	int8_t rec_buff_[kMaxBufferSizeBytes];
+	int rec_buff_index_;
+	int len_bytes_per_10ms_;
 	int nb_samples_10ms_;
 
 	rtc::Thread* rec_worker_thread_;
 
-	// Protects variables that are accessed from process_thread_ and
-	// the main thread.
-	mutable rtc::CriticalSection crit_;
-	// Protects |audio_callback_| that is accessed from process_thread_ and
-	// the main thread.
-	rtc::CriticalSection crit_callback_;
+	CriticalSectionWrapper& _critSect;
+	CriticalSectionWrapper& _critSectCb;
+	uint32_t _recSampleRate;
+	uint8_t _recChannels;
+
+	// selected recording channel (left/right/both)
+	AudioDeviceModule::ChannelType _recChannel;
+
+	// 2 or 4 depending on mono or stereo
+	uint8_t _recBytesPerSample;
+
+	// 10ms in stereo @ 96kHz
+	int8_t _recBuffer[kMaxBufferSizeBytes];
+
+	// one sample <=> 2 or 4 bytes
+	uint32_t _recSamples;
+	uint32_t _recSize;           // in bytes
+
+	uint32_t _currentMicLevel;
+	uint32_t _newMicLevel;
+
+	bool _typingStatus;
+
+	int _totalDelayMS;
+	int _clockDrift;
+
+	uint16_t _record_index;
 };
 }  // namespace gang
 

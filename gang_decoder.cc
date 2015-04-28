@@ -43,12 +43,10 @@ void GangDecoder::GetBestFormat(int* width, int* height, int* fps) {
 }
 
 void GangDecoder::GetAudioInfo(
-		int* sample_rate,
-		int* channels,
-		int* bytesPerSample) {
+		uint32_t* sample_rate,
+		uint8_t* channels) {
 	*sample_rate = decoder_->sample_rate;
 	*channels = decoder_->channels;
-	*bytesPerSample = decoder_->bytesPerSample;
 }
 
 void GangDecoder::Run() {

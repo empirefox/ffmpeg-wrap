@@ -52,7 +52,9 @@ public:
 	void SetAudioFrameObserver(AudioFrameObserver* audio_frame_observer_);
 	// TODO change to GetVideoInfo
 	void GetBestFormat(int* width, int* height, int* fps);
-	void GetAudioInfo(int* sample_rate, int* channels, int* bytesPerSample);
+	void GetAudioInfo(
+			uint32_t* sample_rate,
+			uint8_t* channels);
 private:
 	bool connect();
 	void disconnect();
