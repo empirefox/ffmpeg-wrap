@@ -200,9 +200,9 @@ public:
 	// End of functions inherited from webrtc::AudioDeviceModule.
 	bool Initialize(GangDecoder* decoder);
 
-	int32_t SetRecordedBuffer(const void* audioBuffer, uint32_t nSamples);
-
 	int32_t DeliverRecordedData();
+
+	void OnRecData(SampleData* msg_data);
 
 	virtual void OnMessage(rtc::Message* msg) override;
 
@@ -234,6 +234,7 @@ private:
 
 	// User provided thread context.
 	GangDecoder* decoder_;
+	// 10ms in stereo @ 96kHz
 	int8_t rec_buff_[kMaxBufferSizeBytes];
 	int rec_buff_index_;
 	int len_bytes_per_10ms_;
@@ -251,13 +252,6 @@ private:
 
 	// 2 or 4 depending on mono or stereo
 	uint8_t _recBytesPerSample;
-
-	// 10ms in stereo @ 96kHz
-	int8_t _recBuffer[kMaxBufferSizeBytes];
-
-	// one sample <=> 2 or 4 bytes
-	uint32_t _recSamples;
-	uint32_t _recSize;           // in bytes
 
 	uint32_t _currentMicLevel;
 	uint32_t _newMicLevel;

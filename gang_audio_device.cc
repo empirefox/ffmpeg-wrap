@@ -44,8 +44,6 @@ GangAudioDevice::GangAudioDevice() :
 				_recChannels(0),
 				_recChannel(AudioDeviceModule::kChannelBoth),
 				_recBytesPerSample(0),
-				_recSamples(0),
-				_recSize(0),
 				_currentMicLevel(0),
 				_newMicLevel(0),
 				_typingStatus(false),
@@ -55,7 +53,6 @@ GangAudioDevice::GangAudioDevice() :
 	printf("GangAudioDevice\n");
 	rec_worker_thread_->Start();
 
-	memset(_recBuffer, 0, kMaxBufferSizeBytes);
 	memset(rec_buff_, 0, kMaxBufferSizeBytes);
 }
 
@@ -632,79 +629,14 @@ void GangAudioDevice::OnAudioFrame(void* data, uint32_t nSamples) {
 }
 
 // ----------------------------------------------------------------------------
-//  SetRecordedBuffer
-//
-//  Store recorded audio buffer in local memory ready for the actual
-//  "delivery" using a callback.
-//
-//  This method can also parse out left or right channel from a stereo
-//  input signal, i.e., emulate mono.
-//
-//  Examples:
-//
-//  16-bit,48kHz mono,  10ms => nSamples=480 => _recSize=2*480=960 bytes
-//  16-bit,48kHz stereo,10ms => nSamples=480 => _recSize=4*480=1920 bytes
-// ----------------------------------------------------------------------------
-
-int32_t GangAudioDevice::SetRecordedBuffer(
-		const void* audioBuffer,
-		uint32_t nSamples) {
-	CriticalSectionScoped lock(&_critSect);
-
-	if (_recBytesPerSample == 0) {
-		assert(false);
-		return -1;
-	}
-
-	_recSamples = nSamples;
-	_recSize = _recBytesPerSample * nSamples; // {2,4}*nSamples
-
-	if (nSamples != _recSamples) {
-		return -1;
-	}
-
-	if (_recChannel == AudioDeviceModule::kChannelBoth) {
-		// (default) copy the complete input buffer to the local buffer
-		memcpy(&_recBuffer[0], audioBuffer, _recSize);
-	} else {
-		int16_t* ptr16In = (int16_t*) audioBuffer;
-		int16_t* ptr16Out = (int16_t*) &_recBuffer[0];
-
-		if (AudioDeviceModule::kChannelRight == _recChannel) {
-			ptr16In++;
-		}
-
-		// exctract left or right channel from input buffer to the local buffer
-		for (uint32_t i = 0; i < _recSamples; i++) {
-			*ptr16Out = *ptr16In;
-			ptr16Out++;
-			ptr16In++;
-			ptr16In++;
-		}
-	}
-
-	return 0;
-}
-
-// ----------------------------------------------------------------------------
 //  DeliverRecordedData
 // ----------------------------------------------------------------------------
 
 int32_t GangAudioDevice::DeliverRecordedData() {
-	CriticalSectionScoped lock(&_critSectCb);
-
-	// Ensure that user has initialized all essential members
-	if ((_recSampleRate == 0) || (_recSamples == 0) || (_recBytesPerSample == 0)
-			|| (_recChannels == 0)) {
-		return -1;
-	}
-
-	int32_t res(0);
 	uint32_t newMicLevel(0);
-
-	res = audio_callback_->RecordedDataIsAvailable(
-			&_recBuffer[0],
-			_recSamples,
+	int32_t res = audio_callback_->RecordedDataIsAvailable( //
+			rec_buff_, // need interleaved data
+			nb_samples_10ms_, // 10ms samples
 			_recBytesPerSample,
 			_recChannels,
 			_recSampleRate,
@@ -717,46 +649,74 @@ int32_t GangAudioDevice::DeliverRecordedData() {
 		_newMicLevel = newMicLevel;
 	}
 
+	//				int32_t ret = audio_callback_->RecordedDataIsAvailable(
+	//						rec_buff_,	// need interleaved data
+	//						nb_samples_10ms_ / channels_, // 10ms samples
+	//						len_bytes_per_sample_,
+	//						channels_,
+	//						sample_rate_ / channels_,
+	//						kTotalDelayMs,
+	//						kClockDriftMs,
+	//						current_mic_level,
+	//						key_pressed,
+	//						current_mic_level);
+	//				if (ret != 0)
+	//					printf("GangAudioDevice::OnMessage(), return:%d\n", ret);
+	//
 	return 0;
+}
+
+// ----------------------------------------------------------------------------
+//  OnMessage
+//
+//  Store recorded audio buffer in local memory ready for the actual
+//  "delivery" using a callback.
+//
+//  This method can also parse out left or right channel from a stereo
+//  input signal, i.e., emulate mono.
+//
+//  Examples:
+//
+//  16-bit,48kHz mono,  10ms => nSamples=480 => _recSize=2*480=960 bytes
+//  16-bit,48kHz stereo,10ms => nSamples=480 => _recSize=4*480=1920 bytes
+// ----------------------------------------------------------------------------
+void GangAudioDevice::OnRecData(SampleData* msg_data) {
+	int8_t* data = reinterpret_cast<int8_t*>(msg_data->data_);
+
+	uint32_t nb_src_bytes = msg_data->nSamples_ * _recBytesPerSample;
+	uint32_t src_index = 0;
+
+	CriticalSectionScoped lock(&_critSectCb);
+	// Ensure that user has initialized all essential members
+	if ((_recSampleRate == 0) || (nb_src_bytes == 0) || (_recChannels == 0)) {
+		goto end;
+	}
+
+	if (AudioDeviceModule::kChannelRight == _recChannel) {
+		++src_index;
+	}
+	do {
+		rec_buff_[rec_buff_index_] = data[src_index];
+		++rec_buff_index_;
+		++src_index;
+		if (_recChannel != AudioDeviceModule::kChannelBoth) {
+			++src_index;
+		}
+
+		if (rec_buff_index_ == len_bytes_per_10ms_) {
+			rec_buff_index_ = 0;
+			DeliverRecordedData();
+		}
+	} while (src_index < nb_src_bytes);
+
+	end: free(data);
+	delete msg_data;
 }
 
 void GangAudioDevice::OnMessage(rtc::Message* msg) {
 	switch (msg->message_id) {
 	case MSG_REC_DATA:
-		SampleData* msg_data = static_cast<SampleData*>(msg->pdata);
-		int8_t* data = reinterpret_cast<int8_t*>(msg_data->data_);
-
-		uint32_t nb_src_bytes = msg_data->nSamples_ * _recBytesPerSample;
-		uint32_t src_index = 0;
-		do {
-			rec_buff_[rec_buff_index_] = data[src_index];
-			++src_index;
-			++rec_buff_index_;
-			if (rec_buff_index_ == len_bytes_per_10ms_) {
-				rec_buff_index_ = 0;
-				SetRecordedBuffer(rec_buff_, nb_samples_10ms_);
-				DeliverRecordedData();
-
-//				int32_t ret = audio_callback_->RecordedDataIsAvailable(
-//						rec_buff_,	// need interleaved data
-//						nb_samples_10ms_ / channels_, // 10ms samples
-//						len_bytes_per_sample_,
-//						channels_,
-//						sample_rate_ / channels_,
-//						kTotalDelayMs,
-//						kClockDriftMs,
-//						current_mic_level,
-//						key_pressed,
-//						current_mic_level);
-//				if (ret != 0)
-//					printf("GangAudioDevice::OnMessage(), return:%d\n", ret);
-//
-			}
-		} while (src_index < nb_src_bytes);
-
-		free(data);
-		delete msg_data;
-
+		OnRecData(static_cast<SampleData*>(msg->pdata));
 		break;
 	}
 }
