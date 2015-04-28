@@ -8,10 +8,27 @@ static int get_format_from_sample_fmt(
 	struct sample_fmt_entry {
 		enum AVSampleFormat sample_fmt;
 		const char *fmt_be, *fmt_le;
-	} sample_fmt_entries[] = { { AV_SAMPLE_FMT_U8, "u8", "u8" }, {
-			AV_SAMPLE_FMT_S16, "s16be", "s16le" }, { AV_SAMPLE_FMT_S32, "s32be",
-			"s32le" }, { AV_SAMPLE_FMT_FLT, "f32be", "f32le" }, {
-			AV_SAMPLE_FMT_DBL, "f64be", "f64le" }, };
+	} sample_fmt_entries[] = {
+			{
+					AV_SAMPLE_FMT_U8,
+					"u8",
+					"u8" },
+			{
+					AV_SAMPLE_FMT_S16,
+					"s16be",
+					"s16le" },
+			{
+					AV_SAMPLE_FMT_S32,
+					"s32be",
+					"s32le" },
+			{
+					AV_SAMPLE_FMT_FLT,
+					"f32be",
+					"f32le" },
+			{
+					AV_SAMPLE_FMT_DBL,
+					"f64be",
+					"f64le" }, };
 	*fmt = NULL;
 
 	for (i = 0; i < FF_ARRAY_ELEMS(sample_fmt_entries); i++) {
@@ -139,7 +156,7 @@ int init_gang_decoder(struct gang_decoder* decoder) {
 		printf("sample_rate: %d\n", decoder->sample_rate);
 
 		// TODO for test
-		decoder->channels = 1;
+//		decoder->channels = 1;
 	}
 
 	avformat_close_input(&i_fmt_ctx);

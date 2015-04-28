@@ -253,9 +253,10 @@ int32_t GangAudioDevice::StartRecording() {
 			sample_rate_,
 			channels_,
 			bytesPerSample_);
+	sample_rate_ = 44100/2;
 
 	// init rec_rest_buff_ 10ms container
-	len_bytes_10ms_ = sample_rate_ * channels_ / 100;
+	len_bytes_10ms_ = sample_rate_ * bytesPerSample_ * channels_ / 100;
 	rec_send_buff_ = new uint8_t[len_bytes_10ms_];
 	rec_rest_buff_ = new uint8_t[len_bytes_10ms_];
 	return 0;
@@ -383,15 +384,15 @@ int32_t GangAudioDevice::MicrophoneVolumeIsAvailable(bool* available) {
 }
 
 int32_t GangAudioDevice::SetMicrophoneVolume(uint32_t volume) {
-	printf("GangAudioDevice::SetMicrophoneVolume()\n");
-	rtc::CritScope cs(&crit_);
+//	printf("GangAudioDevice::SetMicrophoneVolume()\n");
+//	rtc::CritScope cs(&crit_);
 	current_mic_level_ = volume;
 	return 0;
 }
 
 int32_t GangAudioDevice::MicrophoneVolume(uint32_t* volume) const {
-	printf("GangAudioDevice::MicrophoneVolume()\n");
-	rtc::CritScope cs(&crit_);
+//	printf("GangAudioDevice::MicrophoneVolume()\n");
+//	rtc::CritScope cs(&crit_);
 	*volume = current_mic_level_;
 	return 0;
 }
@@ -499,7 +500,7 @@ int32_t GangAudioDevice::StereoRecordingIsAvailable(bool* available) const {
 
 int32_t GangAudioDevice::SetStereoRecording(bool enable) {
 	printf("GangAudioDevice::SetStereoRecording()\n");
-	if (!enable) {
+	if (enable) {
 		printf("GangAudioDevice::SetStereoRecording() to false\n");
 		return 0;
 	}
@@ -652,7 +653,7 @@ bool GangAudioDevice::Initialize(GangDecoder* decoder) {
 }
 
 void GangAudioDevice::OnAudioFrame(void* data, uint32_t nSamples) {
-	printf("GangAudioDevice::OnAudioFrame(), nSamples:%d\n", nSamples);
+//	printf("GangAudioDevice::OnAudioFrame(), nSamples:%d\n", nSamples);
 	if (!audio_callback_) {
 		return;
 	}
@@ -670,9 +671,6 @@ void GangAudioDevice::OnMessage(rtc::Message* msg) {
 		uint32_t current_mic_level = 0;
 		MicrophoneVolume(&current_mic_level);
 		SampleData* msg_data = static_cast<SampleData*>(msg->pdata);
-		printf(
-				"GangAudioDevice::OnMessage(), nSamples:%d\n",
-				msg_data->nSamples_);
 		uint8_t* data = reinterpret_cast<uint8_t*>(msg_data->data_);
 
 		uint32_t total_index = 0;
@@ -685,9 +683,10 @@ void GangAudioDevice::OnMessage(rtc::Message* msg) {
 				to_index = 0;
 
 				int32_t ret = audio_callback_->RecordedDataIsAvailable(
+				// need interleaved data
 						rec_send_buff_,
-						len_bytes_10ms_,
-						bytesPerSample_,
+						len_bytes_10ms_ / (bytesPerSample_ * channels_),
+						bytesPerSample_ * channels_,
 						channels_,
 						sample_rate_,
 						kTotalDelayMs,
