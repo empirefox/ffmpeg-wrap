@@ -244,6 +244,7 @@ private:
 	uint8_t* rec_rest_buff_;
 	int rec_rest_buff_size_;
 	int len_bytes_10ms_;
+	int nb_samples_10ms_;
 
 	rtc::Thread* rec_worker_thread_;
 

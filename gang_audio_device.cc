@@ -44,6 +44,7 @@ GangAudioDevice::GangAudioDevice() :
 				rec_rest_buff_(NULL),
 				rec_rest_buff_size_(0),
 				len_bytes_10ms_(0),
+				nb_samples_10ms_(0),
 				rec_worker_thread_(new rtc::Thread) {
 	rec_worker_thread_->Start();
 	printf("GangAudioDevice\n");
@@ -83,7 +84,7 @@ int64_t GangAudioDevice::TimeUntilNextProcess() {
 }
 
 int32_t GangAudioDevice::Process() {
-	printf("GangAudioDevice::Process()\n");
+//	printf("GangAudioDevice::Process()\n");
 	last_process_time_ms_ = rtc::Time();
 	return 0;
 }
@@ -253,10 +254,12 @@ int32_t GangAudioDevice::StartRecording() {
 			sample_rate_,
 			channels_,
 			bytesPerSample_);
-	sample_rate_ = 44100/2;
+
+	bytesPerSample_ = bytesPerSample_ * channels_;
+	nb_samples_10ms_ = sample_rate_ / 100;
 
 	// init rec_rest_buff_ 10ms container
-	len_bytes_10ms_ = sample_rate_ * bytesPerSample_ * channels_ / 100;
+	len_bytes_10ms_ = nb_samples_10ms_ * bytesPerSample_;
 	rec_send_buff_ = new uint8_t[len_bytes_10ms_];
 	rec_rest_buff_ = new uint8_t[len_bytes_10ms_];
 	return 0;
@@ -685,10 +688,10 @@ void GangAudioDevice::OnMessage(rtc::Message* msg) {
 				int32_t ret = audio_callback_->RecordedDataIsAvailable(
 				// need interleaved data
 						rec_send_buff_,
-						len_bytes_10ms_ / (bytesPerSample_ * channels_),
-						bytesPerSample_ * channels_,
+						nb_samples_10ms_ / channels_, // 10ms samples
+						bytesPerSample_,
 						channels_,
-						sample_rate_,
+						sample_rate_ / channels_,
 						kTotalDelayMs,
 						kClockDriftMs,
 						current_mic_level,
@@ -699,7 +702,7 @@ void GangAudioDevice::OnMessage(rtc::Message* msg) {
 
 				SetMicrophoneVolume(current_mic_level);
 			}
-		} while (total_index < msg_data->nSamples_);
+		} while (total_index < msg_data->nSamples_ * bytesPerSample_);
 
 		rec_rest_buff_size_ = to_index;
 
