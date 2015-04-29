@@ -156,9 +156,6 @@ int init_gang_decoder(struct gang_decoder* decoder) {
 		printf("fmt: %s\n", fmt);
 		printf("channels: %d\n", decoder->channels);
 		printf("sample_rate: %d\n", decoder->sample_rate);
-
-		// TODO for test
-//		decoder->channels = 1;
 	}
 
 	avformat_close_input(&i_fmt_ctx);
