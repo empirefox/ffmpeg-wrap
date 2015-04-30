@@ -179,7 +179,7 @@ int init_audio_resampler(
 			// log
 			0,
 			NULL);
-	if (!*resample_context) {
+	if (!(*resample_context)) {
 		fprintf(stderr, "Could not allocate resample context\n");
 		return AVERROR(ENOMEM);
 	}

@@ -30,16 +30,10 @@ void GangDecoder::Stop() {
 }
 
 bool GangDecoder::Init() {
-	printf("GangDecoder::Init\n");
-	if (::open_gang_decoder(decoder_)) {
-		printf("GangDecoder::Init false\n");
-		::close_gang_decoder(decoder_);
-		// open error
-		return false;
-	}
+	bool ok = !::open_gang_decoder(decoder_);
 	::close_gang_decoder(decoder_);
-	printf("GangDecoder::Init true\n");
-	return true;
+	printf("GangDecoder::Init %s\n", ok ? "true" : "false");
+	return ok;
 }
 
 void GangDecoder::GetBestFormat(int* width, int* height, int* fps) {

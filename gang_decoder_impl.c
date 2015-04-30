@@ -53,11 +53,21 @@ void init_gang_video_info(struct gang_decoder *decoder) {
 		// TODO maybe need calculate it.
 		decoder->fps = 10000;
 	}
+	fprintf(
+			stderr,
+			"init_gang_video_info pix_fmt:%s, fps:%d\n",
+			av_get_pix_fmt_name(decoder->pix_fmt),
+			decoder->fps);
 }
 
 void init_gang_audio_info(struct gang_decoder *decoder) {
 	decoder->channels = decoder->audio_stream->codec->channels;
 	decoder->sample_rate = decoder->audio_stream->codec->sample_rate;
+	fprintf(
+			stderr,
+			"init_gang_audio_info no resample, channels:%d, sample_rate:%d\n",
+			decoder->channels,
+			decoder->sample_rate);
 }
 
 // return error
@@ -107,6 +117,17 @@ int open_gang_decoder(struct gang_decoder *decoder) {
 	if (!decoder->swr_ctx) {
 		// Do not need resample, so init info here.
 		init_gang_audio_info(decoder);
+	} else {
+		fprintf(
+				stderr,
+				"init_gang_audio_info WITH resample, channels:%d, sample_rate:%d\n",
+				decoder->channels,
+				decoder->sample_rate);
+		fprintf(
+				stderr,
+				"origin sample format:%s\n",
+				av_get_sample_fmt_name(
+						decoder->audio_stream->codec->sample_fmt));
 	}
 
 	av_init_packet(&decoder->i_pkt);
@@ -183,23 +204,37 @@ int gang_decode_next_video(struct gang_decoder* decoder, void **data, int *size)
 
 int prepare_resample_buffer(struct gang_decoder* decoder) {
 	int ret; // error
+
 	decoder->audio_dst_nb_samples = av_rescale_rnd(
 			decoder->i_frame->nb_samples,
 			decoder->sample_rate,
 			decoder->audio_stream->codec->sample_rate,
 			AV_ROUND_UP);
+
 	if (decoder->audio_dst_nb_samples > decoder->audio_dst_max_nb_samples) {
-		av_freep(&decoder->audio_dst_data[0]);
-		ret = av_samples_alloc(
-				decoder->audio_dst_data,
-				&decoder->audio_dst_linesize,
-				decoder->channels,
-				decoder->audio_dst_nb_samples,
-				AV_SAMPLE_FMT_S16,
-				1);
+		if (decoder->audio_dst_data) {
+			av_freep(&decoder->audio_dst_data[0]);
+			ret = av_samples_alloc(
+					decoder->audio_dst_data,
+					&decoder->audio_dst_linesize,
+					decoder->channels,
+					decoder->audio_dst_nb_samples,
+					AV_SAMPLE_FMT_S16,
+					1);
+		} else {
+			ret = av_samples_alloc_array_and_samples(
+					&decoder->audio_dst_data,
+					&decoder->audio_dst_linesize,
+					decoder->channels,
+					decoder->audio_dst_nb_samples,
+					AV_SAMPLE_FMT_S16,
+					0);
+		}
 		if (ret < 0) {
 			fprintf(
-			stderr, "Error av_samples_alloc (%s)\n", av_err2str(ret));
+					stderr,
+					"Could not allocate destination samples (%s)\n",
+					av_err2str(ret));
 			return ret;
 		}
 		decoder->audio_dst_max_nb_samples = decoder->audio_dst_nb_samples;
