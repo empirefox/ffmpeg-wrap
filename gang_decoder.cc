@@ -20,7 +20,7 @@ GangDecoder::GangDecoder(
 GangDecoder::~GangDecoder() {
 	printf("GangDecoder::~GangDecoder\n");
 	Stop();
-	::free_gang_decode(decoder_);
+	::free_gang_decoder(decoder_);
 }
 
 void GangDecoder::Stop() {
@@ -30,10 +30,16 @@ void GangDecoder::Stop() {
 }
 
 bool GangDecoder::Init() {
-	if (::init_gang_decoder(decoder_) == 1) {
-		return true;
+	printf("GangDecoder::Init\n");
+	if (::open_gang_decoder(decoder_)) {
+		printf("GangDecoder::Init false\n");
+		::close_gang_decoder(decoder_);
+		// open error
+		return false;
 	}
-	return false;
+	::close_gang_decoder(decoder_);
+	printf("GangDecoder::Init true\n");
+	return true;
 }
 
 void GangDecoder::GetBestFormat(int* width, int* height, int* fps) {
@@ -42,11 +48,9 @@ void GangDecoder::GetBestFormat(int* width, int* height, int* fps) {
 	*fps = decoder_->fps;
 }
 
-void GangDecoder::GetAudioInfo(
-		uint32_t* sample_rate,
-		uint8_t* channels) {
-	*sample_rate = decoder_->sample_rate;
-	*channels = decoder_->channels;
+void GangDecoder::GetAudioInfo(uint32_t* sample_rate, uint8_t* channels) {
+	*sample_rate = static_cast<uint32_t>(decoder_->sample_rate);
+	*channels = static_cast<uint8_t>(decoder_->channels);
 }
 
 void GangDecoder::Run() {
@@ -61,7 +65,7 @@ void GangDecoder::Run() {
 bool GangDecoder::connect() {
 	rtc::CritScope cs(&crit_);
 	if (!connected_) {
-		connected_ = ::start_gang_decode(decoder_) == 1;
+		connected_ = !::open_gang_decoder(decoder_);
 	}
 	return connected_;
 }
@@ -75,7 +79,7 @@ bool GangDecoder::Connected() {
 void GangDecoder::disconnect() {
 	rtc::CritScope cs(&crit_);
 	if (connected_) {
-		::stop_gang_decode(decoder_);
+		::close_gang_decoder(decoder_);
 		connected_ = false;
 	}
 }
@@ -94,11 +98,11 @@ bool GangDecoder::NextFrameLoop() {
 	case 2:
 		if (audio_frame_observer_) {
 			++escaped_;
-			if (escaped_ > escape_){
+			if (escaped_ > escape_) {
 				audio_frame_observer_->OnAudioFrame(
 						data,
 						static_cast<uint32_t>(size));
-			}else {
+			} else {
 				free(data);
 			}
 		} else

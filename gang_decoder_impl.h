@@ -1,60 +1,75 @@
-#ifndef GANG_GANG_DECODER_H
-#define GANG_GANG_DECODER_H
+#ifndef GANG_DECODER_IMPL_H_
+#define GANG_DECODER_IMPL_H_
 #ifdef __cplusplus
 extern "C" {
 #endif
 #include <stdint.h>
-#include <libavcodec/avcodec.h> 
-#include <libavformat/avformat.h> 
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
+#include <libswresample/swresample.h>
 
-#include "stdint.h"
+#define GANG_EOF -1
+#define GANG_ERROR_DATA 0
+#define GANG_VIDEO_DATA 1
+#define GANG_AUDIO_DATA 2
 
 struct gang_decoder {
-	char* url;
+	char *url;
 
 	//vidio
 	int width;
 	int height;
 	int fps;
 	enum AVPixelFormat pix_fmt;
+
 	// audio
+	int sample_rate;
+	int channels;
+	int bytes_per_sample;
+	enum AVSampleFormat s16_status;
 
-	uint32_t sample_rate;
-	uint8_t channels;
-	int8_t bytesPerSample;
-	int is_audio_planar_;
-
+	// video decode buff
 	uint8_t *video_dst_data[4];
 	int video_dst_linesize[4];
 	int video_dst_bufsize;
 
+	/**
+	 * audio decode buff
+	 * Temporary storage for the converted input samples.
+	 */
+	uint8_t **audio_dst_data;
+	int audio_dst_max_nb_samples;
+	int audio_dst_linesize;
+	int audio_dst_nb_samples;
+
 	AVFormatContext *i_fmt_ctx;
+	SwrContext *swr_ctx;
 
-	AVCodecContext* video_dec_ctx;
-
-	AVCodecContext* audio_dec_ctx;
-
-	unsigned video_stream_index;
-	unsigned audio_stream_index;
+	AVStream *video_stream;
+	AVStream *audio_stream;
 
 	AVPacket i_pkt;
-
-	// and more
+	AVFrame *i_frame;
 };
 
 // create gang_decode with given url
 struct gang_decoder* new_gang_decoder(const char* url);
 
-// get best format
-int init_gang_decoder(struct gang_decoder* decoder);
+// free gang_decoder
+void free_gang_decoder(struct gang_decoder* decoder);
 
-// prepare AVCodecContext... and store to struct
-int start_gang_decode(struct gang_decoder* decoder);
+// Init all buffer and data that are needed by decoder.
+// return error
+int open_gang_decoder(struct gang_decoder* decoder);
+
+// Free all memo that opened by open_gang_decoder.
+void close_gang_decoder(struct gang_decoder* decoder);
 
 // Read a single frame.
-// WebRTC support: I420, YUY2, UYVY, ARGB.
+// TODO but not now.
+// Support: I420, YUY2, UYVY, ARGB.
 // I420 will not be converted again, other format will not be supported
-// until changing the api(init_gang_decoder) to output the format to c++.
+// until changing the api(open_gang_decoder) to output the format to c++.
 // For HD avoid YU12 which is a software conversion and has 2 bugs.
 //
 // output: *data, need allocate and assign to **data.(do not free it)
@@ -65,14 +80,8 @@ int gang_decode_next_frame(
 		void **data,
 		int *size);
 
-// disconnect from remote stream and free AVCodecContext...
-void stop_gang_decode(struct gang_decoder* decoder);
-
-// free gang_decoder
-void free_gang_decode(struct gang_decoder* decoder);
-
 #ifdef __cplusplus
 } // closing brace for extern "C"
 #endif
 
-#endif // GANG_GANG_DECODER_H
+#endif // GANG_DECODER_IMPL_H_

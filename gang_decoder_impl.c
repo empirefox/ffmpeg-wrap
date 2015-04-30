@@ -1,351 +1,327 @@
-#include <stdlib.h>
+#include <libavutil/imgutils.h>
+
 #include "gang_decoder_impl.h"
-
-static int get_format_from_sample_fmt(
-		const char **fmt,
-		enum AVSampleFormat sample_fmt) {
-	int i;
-	struct sample_fmt_entry {
-		enum AVSampleFormat sample_fmt;
-		const char *fmt_be, *fmt_le;
-	} sample_fmt_entries[] = {
-			{
-					AV_SAMPLE_FMT_U8,
-					"u8",
-					"u8" },
-			{
-					AV_SAMPLE_FMT_S16,
-					"s16be",
-					"s16le" },
-			{
-					AV_SAMPLE_FMT_S32,
-					"s32be",
-					"s32le" },
-			{
-					AV_SAMPLE_FMT_FLT,
-					"f32be",
-					"f32le" },
-			{
-					AV_SAMPLE_FMT_DBL,
-					"f64be",
-					"f64le" }, };
-	*fmt = NULL;
-
-	for (i = 0; i < FF_ARRAY_ELEMS(sample_fmt_entries); i++) {
-		struct sample_fmt_entry *entry = &sample_fmt_entries[i];
-		if (sample_fmt == entry->sample_fmt) {
-			*fmt = AV_NE(entry->fmt_be, entry->fmt_le);
-			return 0;
-		}
-	}
-
-	fprintf(
-			stderr,
-			"sample format %s is not supported as output format\n",
-			av_get_sample_fmt_name(sample_fmt));
-	return -1;
-}
-
-int decode_register_init = 0;
-static int decode_init() {
-	avcodec_register_all();
-	av_register_all();
-	avformat_network_init();
-	decode_register_init = 1;
-	return 1;
-}
+#include "ffmpeg_format.h"
 
 // create gang_decode with given url
-struct gang_decoder* new_gang_decoder(const char* url) {
-	struct gang_decoder * decoder = (struct gang_decoder*) malloc(
+struct gang_decoder *new_gang_decoder(const char *url) {
+	struct gang_decoder *decoder = (struct gang_decoder*) malloc(
 			sizeof(struct gang_decoder));
-	decoder->url = url;
-	decoder->video_stream_index = -1;
-	decoder->audio_stream_index = -1;
-	decoder->is_audio_planar_ = 0;
+	decoder->url = (char*) url;
+
+	decoder->width = 0;
+	decoder->height = 0;
+	decoder->fps = 0;
+	decoder->pix_fmt = AV_PIX_FMT_NONE;
+
+	decoder->channels = 0;
+	decoder->sample_rate = 0;
+	decoder->bytes_per_sample = 2; // always output s16
+	decoder->s16_status = AV_SAMPLE_FMT_NONE;
+
+	decoder->video_dst_data[0] = NULL;
+	decoder->video_dst_bufsize = 0;
+
+	decoder->audio_dst_data = NULL;
+	decoder->audio_dst_max_nb_samples = 0;
+	decoder->audio_dst_linesize = 0;
+	decoder->audio_dst_nb_samples = 0;
 
 	decoder->i_fmt_ctx = NULL;
-	decoder->video_dec_ctx = NULL;
-	decoder->audio_dec_ctx = NULL;
-	decoder->video_dst_data[0] = NULL;
+	decoder->swr_ctx = NULL;
+
+	decoder->video_stream = NULL;
+	decoder->audio_stream = NULL;
+
+	decoder->i_frame = NULL;
 
 	return decoder;
 }
 
-int init_gang_decoder(struct gang_decoder* decoder) {
-	if (decode_register_init == 0) {
-		decode_init();
-	}
-
-	AVFormatContext *i_fmt_ctx = NULL;
-	unsigned video_stream_index = -1;
-	unsigned audio_stream_index = -1;
-
-	AVCodecContext* video_dec_ctx = NULL;
-	AVCodec* video_dec = NULL;
-	AVCodecContext* audio_dec_ctx = NULL;
-	AVCodec* audio_dec = NULL;
-
-	i_fmt_ctx = avformat_alloc_context();
-
-	if (avformat_open_input(&i_fmt_ctx, decoder->url, NULL, NULL) != 0) {
-		fprintf(stderr, "could not open input file\n");
-		return -1;
-	}
-
-	if (avformat_find_stream_info(i_fmt_ctx, NULL) < 0) {
-		fprintf(stderr, "could not find stream info\n");
-		avformat_close_input(&i_fmt_ctx);
-		return -1;
-	}
-
-	/* find stream index */
-	for (unsigned i = 0; i < i_fmt_ctx->nb_streams; i++) {
-		if (i_fmt_ctx->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO) {
-
-			printf("video_stream_index: %d\n", i);
-			video_stream_index = i;
-			//break;
-		} else if (i_fmt_ctx->streams[i]->codec->codec_type
-				== AVMEDIA_TYPE_AUDIO) {
-			printf("audio_stream_index: %d\n", i);
-			audio_stream_index = i;
-		}
-	}
-	if (video_stream_index != -1) {
-		video_dec_ctx = i_fmt_ctx->streams[video_stream_index]->codec;
-		video_dec = avcodec_find_decoder(video_dec_ctx->codec_id);
-		if (avcodec_open2(video_dec_ctx, video_dec, NULL) < 0) {
-			avformat_close_input(&i_fmt_ctx);
-			return 0;
-		}
-		decoder->width = video_dec_ctx->width;
-		decoder->height = video_dec_ctx->height;
-		decoder->fps = 24;
-		decoder->pix_fmt = video_dec_ctx->pix_fmt;
-		fprintf(
-				stderr,
-				"init format: %s\n",
-				av_get_pix_fmt_name(video_dec_ctx->pix_fmt));
-	}
-
-	if (audio_stream_index != -1) {
-		audio_dec_ctx = i_fmt_ctx->streams[audio_stream_index]->codec;
-		enum AVSampleFormat sfmt = audio_dec_ctx->sample_fmt;
-		const char *fmt;
-
-		if (av_sample_fmt_is_planar(sfmt)) {
-			const char *packed = av_get_sample_fmt_name(sfmt);
-			printf(
-					"Warning: the sample format the decoder produced is planar "
-							"(%s). This example will output the first channel only.\n",
-					packed ? packed : "?");
-			sfmt = av_get_packed_sample_fmt(sfmt);
-			decoder->is_audio_planar_ = 1;
-		}
-
-		if ((get_format_from_sample_fmt(&fmt, sfmt)) < 0)
-			printf("get_format_from_sample_fmt < 0");
-
-		decoder->channels = audio_dec_ctx->channels;
-//		decoder->channels = 1;
-		decoder->sample_rate = audio_dec_ctx->sample_rate;
-		decoder->bytesPerSample = av_get_bytes_per_sample(
-				audio_dec_ctx->sample_fmt);
-		printf("sfmt: %s\n", av_get_sample_fmt_name(sfmt));
-		printf("fmt: %s\n", fmt);
-		printf("channels: %d\n", decoder->channels);
-		printf("sample_rate: %d\n", decoder->sample_rate);
-	}
-
-	avformat_close_input(&i_fmt_ctx);
-	return 1;
+void free_gang_decoder(struct gang_decoder *decoder) {
+	free(decoder);
 }
-// prepare AVCodecContext... and store to struct
-int start_gang_decode(struct gang_decoder* decoder_) {
-	int size = 0;
 
-	if (decode_register_init == 0) {
-		decode_init();
+void init_gang_video_info(struct gang_decoder *decoder) {
+	decoder->pix_fmt = decoder->video_stream->codec->pix_fmt;
+	decoder->width = decoder->video_stream->codec->width;
+	decoder->height = decoder->video_stream->codec->height;
+	AVRational rate = decoder->video_stream->r_frame_rate;
+	if (rate.den) {
+		decoder->fps = rate.num / rate.den;
+	} else {
+		// TODO maybe need calculate it.
+		decoder->fps = 10000;
 	}
+}
 
-	AVCodec* video_dec = NULL;
+void init_gang_audio_info(struct gang_decoder *decoder) {
+	decoder->channels = decoder->audio_stream->codec->channels;
+	decoder->sample_rate = decoder->audio_stream->codec->sample_rate;
+}
 
-	AVCodec* audio_dec = NULL;
-
-	decoder_->i_fmt_ctx = avformat_alloc_context();
-
-	if (avformat_open_input(&decoder_->i_fmt_ctx, decoder_->url, NULL, NULL)
-			!= 0) {
-		fprintf(stderr, "start_gang_decode: could not open input file\n");
-		return -1;
-	}
-
-	if (avformat_find_stream_info(decoder_->i_fmt_ctx, NULL) < 0) {
-		fprintf(stderr, "could not find stream info\n");
-		return -1;
-	}
-
-	/* find stradms index */
-	for (unsigned i = 0; i < decoder_->i_fmt_ctx->nb_streams; i++) {
-		if (decoder_->i_fmt_ctx->streams[i]->codec->codec_type
-				== AVMEDIA_TYPE_VIDEO) {
-
-			decoder_->video_stream_index = i;
-			//break;
-		} else if (decoder_->i_fmt_ctx->streams[i]->codec->codec_type
-				== AVMEDIA_TYPE_AUDIO) {
-			decoder_->audio_stream_index = i;
-		}
-	}
-	if (decoder_->video_stream_index != -1) {
-		decoder_->video_dec_ctx =
-				decoder_->i_fmt_ctx->streams[decoder_->video_stream_index]->codec;
-		video_dec = avcodec_find_decoder(decoder_->video_dec_ctx->codec_id);
-		if (avcodec_open2(decoder_->video_dec_ctx, video_dec, NULL) < 0) {
-			return 0;
-		}
-	}
-	if (decoder_->audio_stream_index != -1) {
-		decoder_->audio_dec_ctx =
-				decoder_->i_fmt_ctx->streams[decoder_->audio_stream_index]->codec;
-		audio_dec = avcodec_find_decoder(decoder_->audio_dec_ctx->codec_id);
-		if (avcodec_open2(decoder_->audio_dec_ctx, audio_dec, NULL) < 0) {
-			return 0;
-		}
-	}
-
-	av_init_packet(&decoder_->i_pkt);
-
+// return error
+int init_gang_video_decode_buffer(struct gang_decoder *decoder) {
 	/* allocate image where the decoded image will be put */
-	size = av_image_alloc(
-			decoder_->video_dst_data,
-			decoder_->video_dst_linesize,
-			decoder_->width,
-			decoder_->height,
-			decoder_->pix_fmt,
+	int size = av_image_alloc(
+			decoder->video_dst_data,
+			decoder->video_dst_linesize,
+			decoder->width,
+			decoder->height,
+			decoder->pix_fmt,
 			1);
 	if (size < 0) {
 		fprintf(stderr, "Could not allocate raw video buffer\n");
-		return 0;
+		return -1;
 	}
-	decoder_->video_dst_bufsize = size;
-	return 1;
+	decoder->video_dst_bufsize = size;
+	return 0;
 }
 
+// return error
+int open_gang_decoder(struct gang_decoder *decoder) {
+	int error;
+	av_register_all();
+	avformat_network_init();
+
+	error = open_input_file(
+			decoder->url,
+			&decoder->i_fmt_ctx,
+			&decoder->video_stream,
+			&decoder->audio_stream);
+	if (error) {
+		return error;
+	}
+
+	error = init_audio_resampler(
+			decoder->audio_stream->codec,
+			&decoder->swr_ctx,
+			&decoder->channels,
+			&decoder->sample_rate,
+			&decoder->s16_status);
+	if (error) {
+		return error;
+	}
+
+	init_gang_video_info(decoder);
+	if (!decoder->swr_ctx) {
+		// Do not need resample, so init info here.
+		init_gang_audio_info(decoder);
+	}
+
+	av_init_packet(&decoder->i_pkt);
+
+	// must be called after init_gang_video_info
+	error = init_gang_video_decode_buffer(decoder);
+	if (error) {
+		return error;
+	}
+
+	error = init_input_frame(&decoder->i_frame);
+	if (error) {
+		return error;
+	}
+	fprintf(stderr, "open_gang_decoder ok\n");
+
+	return 0;
+}
+
+void close_gang_decoder(struct gang_decoder *decoder) {
+	if (decoder->i_fmt_ctx)
+		avformat_close_input(&decoder->i_fmt_ctx);
+	// free av_image_alloc
+	if (decoder->video_dst_data[0])
+		av_free(decoder->video_dst_data[0]);
+	decoder->video_stream = NULL;
+	decoder->audio_stream = NULL;
+	// free SwrContext
+	if (decoder->swr_ctx)
+		swr_free(&decoder->swr_ctx);
+	if (decoder->audio_dst_data)
+		av_freep(&decoder->audio_dst_data[0]);
+	av_freep(&decoder->audio_dst_data);
+	if (decoder->i_frame)
+		av_frame_free(&decoder->i_frame);
+	fprintf(stderr, "close_gang_decoder ok\n");
+}
+
+// return error
+int gang_decode_next_video(struct gang_decoder* decoder, void **data, int *size) {
+
+	int error, got_picture = 0;
+	error = avcodec_decode_video2(
+			decoder->video_stream->codec,
+			decoder->i_frame,
+			&got_picture,
+			&decoder->i_pkt);
+
+	if (error < 0) {
+		fprintf(stderr, "Error decoding video frame (%s)\n", av_err2str(error));
+		return error;
+	}
+
+	if (!got_picture) {
+		fprintf(stderr, "Cannot decode video frame!\n");
+		return -1;
+	}
+
+	av_image_copy(
+			decoder->video_dst_data,
+			decoder->video_dst_linesize,
+			(const uint8_t **) (decoder->i_frame->data),
+			decoder->i_frame->linesize,
+			decoder->pix_fmt,
+			decoder->width,
+			decoder->height);
+
+	*data = (uint8_t*) malloc(decoder->video_dst_bufsize);
+	memcpy(*data, decoder->video_dst_data[0], decoder->video_dst_bufsize);
+	*size = decoder->video_dst_bufsize;
+
+	return 0;
+}
+
+int prepare_resample_buffer(struct gang_decoder* decoder) {
+	int ret; // error
+	decoder->audio_dst_nb_samples = av_rescale_rnd(
+			decoder->i_frame->nb_samples,
+			decoder->sample_rate,
+			decoder->audio_stream->codec->sample_rate,
+			AV_ROUND_UP);
+	if (decoder->audio_dst_nb_samples > decoder->audio_dst_max_nb_samples) {
+		av_freep(&decoder->audio_dst_data[0]);
+		ret = av_samples_alloc(
+				decoder->audio_dst_data,
+				&decoder->audio_dst_linesize,
+				decoder->channels,
+				decoder->audio_dst_nb_samples,
+				AV_SAMPLE_FMT_S16,
+				1);
+		if (ret < 0) {
+			fprintf(
+			stderr, "Error av_samples_alloc (%s)\n", av_err2str(ret));
+			return ret;
+		}
+		decoder->audio_dst_max_nb_samples = decoder->audio_dst_nb_samples;
+	}
+	return 0;
+}
+
+int resample_and_copy(
+		struct gang_decoder* decoder,
+		void **data,
+		int *nb_samples) {
+	int ret; // error
+
+	if (!decoder->swr_ctx) {
+		fprintf(stderr, "Swr_ctx not inited\n");
+		return -1;
+	}
+
+	ret = prepare_resample_buffer(decoder);
+	if (ret < 0) {
+		return ret;
+	}
+
+	/* convert to destination format */
+	ret = swr_convert(
+			decoder->swr_ctx,
+			decoder->audio_dst_data,
+			decoder->audio_dst_nb_samples,
+			(const uint8_t **) decoder->i_frame->extended_data,
+			decoder->i_frame->nb_samples);
+	if (ret < 0) {
+		fprintf(stderr, "Error while converting (%s)\n", av_err2str(ret));
+		return ret;
+	}
+
+	int dst_bufsize = av_samples_get_buffer_size(
+			&decoder->audio_dst_linesize,
+			decoder->channels,
+			ret, // output nb_samples
+			AV_SAMPLE_FMT_S16,
+			1);
+	if (dst_bufsize < 0) {
+		fprintf(
+		stderr, "Could not get sample buffer size (%s)\n", av_err2str(ret));
+		return ret;
+	}
+
+	uint8_t* tmp = (uint8_t*) malloc(dst_bufsize);
+	memcpy(tmp, decoder->audio_dst_data[0], dst_bufsize);
+
+	*data = tmp;
+	*nb_samples = decoder->audio_dst_nb_samples;
+	return 0;
+}
+
+// return error
+int gang_decode_next_audio(
+		struct gang_decoder* decoder,
+		void **data,
+		int *nb_samples) {
+
+	int error, got_picture = 0;
+	error = avcodec_decode_audio4(
+			decoder->audio_stream->codec,
+			decoder->i_frame,
+			&got_picture,
+			&decoder->i_pkt);
+	if (error < 0) {
+		fprintf(
+		stderr, "Error decoding audio frame (%s)\n", av_err2str(error));
+		return error;
+	}
+
+	if (!got_picture) {
+		fprintf(stderr, "Cannot decode audio frame!\n");
+		return -1;
+	}
+
+	size_t output_linesize = decoder->i_frame->nb_samples
+			* decoder->bytes_per_sample * decoder->channels;
+	if (output_linesize < 1) {
+		fprintf(stderr, "decode audio frame error! length < 1\n");
+		return -1;
+	}
+
+	if (decoder->s16_status == AV_SAMPLE_FMT_NONE) {
+		return resample_and_copy(decoder, data, nb_samples);
+	}
+
+	uint8_t* tmp = (uint8_t*) malloc(output_linesize);
+	if (decoder->s16_status == AV_SAMPLE_FMT_S16P) {
+		s16p_2_s16(tmp, decoder->i_frame, decoder->channels);
+	} else {
+		memcpy(tmp, decoder->i_frame->extended_data[0], output_linesize);
+	}
+
+	*data = tmp;
+	*nb_samples = decoder->i_frame->nb_samples;
+	return 0;
+}
+
+/**
+ * return: -1->EOF, 0->error, 1->video, 2->audio
+ */
 int gang_decode_next_frame(struct gang_decoder* decoder, void **data, int *size) {
 
 	if (av_read_frame(decoder->i_fmt_ctx, &decoder->i_pkt) < 0) {
 		fprintf(stderr, "av_read_frame error!\n");
-		return 0;
+		// TODO AVERROR_EOF?
+		return GANG_EOF;
 	}
-	AVFrame *pFrame = av_frame_alloc();
-	int got_picture = 0, ret = 0;
 
-	//video
-	if (decoder->i_pkt.stream_index == decoder->video_stream_index) {
-
-		avcodec_decode_video2(
-				decoder->video_dec_ctx,
-				pFrame,
-				&got_picture,
-				&decoder->i_pkt);
-		if (got_picture) {
-
-			av_image_copy(
-					decoder->video_dst_data,
-					decoder->video_dst_linesize,
-					(const uint8_t **) (pFrame->data),
-					pFrame->linesize,
-					decoder->pix_fmt,
-					decoder->width,
-					decoder->height);
-
-			*data = (uint8_t*) malloc(decoder->video_dst_bufsize);
-			memcpy(
-					*data,
-					decoder->video_dst_data[0],
-					decoder->video_dst_bufsize);
-			*size = decoder->video_dst_bufsize;
-			//*pts = decoder->i_pkt.pts;
-			ret = 1;
-
-		} else {
-			fprintf(stderr, "decode video frame error!\n");
-			goto end;
-		}
-
-	} else if (decoder->i_pkt.stream_index == decoder->audio_stream_index) {
-		/* decode audio frame */
-		ret = avcodec_decode_audio4(
-				decoder->audio_dec_ctx,
-				pFrame,
-				&got_picture,
-				&decoder->i_pkt);
-		if (ret < 0) {
-			fprintf(
-			stderr, "Error decoding audio frame (%s)\n", av_err2str(ret));
-			return ret;
-		}
-
-		if (got_picture) {
-			size_t unpadded_linesize = pFrame->nb_samples
-					* decoder->bytesPerSample * decoder->channels;
-			if (unpadded_linesize < 1) {
-				fprintf(stderr, "decode audio frame error! length < 1\n");
-				goto end;
-			}
-
-			/* Write the raw audio data samples of the first plane. This works
-			 * fine for packed formats (e.g. AV_SAMPLE_FMT_S16). However,
-			 * most audio decoders output planar audio, which uses a separate
-			 * plane of audio samples for each channel (e.g. AV_SAMPLE_FMT_S16P).
-			 * In other words, this code will write only the first audio channel
-			 * in these cases.
-			 * You should use libswresample or libavfilter to convert the frame
-			 * to packed data. */
-
-			uint8_t* tmp = (uint8_t*) malloc(unpadded_linesize);
-			if (decoder->is_audio_planar_) {
-				int i, ch;
-				uint8_t* t = tmp;
-				for (i = 0; i < pFrame->nb_samples; i++) {
-					for (ch = 0; ch < decoder->channels; ++ch) {
-						memcpy(
-								t,
-								pFrame->data[ch] + decoder->bytesPerSample * i,
-								decoder->bytesPerSample);
-						t += decoder->bytesPerSample;
-					}
-				}
-			} else {
-				memcpy(tmp, pFrame->extended_data[0], unpadded_linesize);
-			}
-
-			*data = tmp;
-			*size = pFrame->nb_samples;
-			//*pts = decoder_->i_pkt.pts;
-			ret = 2;
-
-		} else {
-			fprintf(stderr, "decode audio frame error!\n");
-			goto end;
-		}
+	if (decoder->video_stream
+			&& decoder->video_stream->index == decoder->i_pkt.stream_index
+			&& !gang_decode_next_video(decoder, data, size)) {
+		av_free_packet(&decoder->i_pkt);
+		return GANG_VIDEO_DATA;
+	} else if (decoder->audio_stream
+			&& decoder->audio_stream->index == decoder->i_pkt.stream_index
+			&& !gang_decode_next_audio(decoder, data, size)) {
+		av_free_packet(&decoder->i_pkt);
+		return GANG_AUDIO_DATA;
 	}
-	end: av_free_packet(&decoder->i_pkt);
-	av_frame_free(&pFrame);
-	return ret;
-
+	return GANG_ERROR_DATA;
 }
-
-// disconnect from remote stream and free AVCodecContext...
-void stop_gang_decode(struct gang_decoder* decoder_) {
-	avformat_close_input(&decoder_->i_fmt_ctx);
-	av_free(decoder_->video_dst_data[0]);
-}
-
-// free gang_decoder
-void free_gang_decode(struct gang_decoder* decoder) {
-	free(decoder);
-}
-
