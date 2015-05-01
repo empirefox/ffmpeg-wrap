@@ -1,20 +1,15 @@
-#include  "gang_decoder.h"
-#include  "gang_decoder_impl.h"
+#include "gang_decoder.h"
+#include "gang_decoder_impl.h"
 #include <iostream>
 #include <stdio.h>
 
 namespace gang {
 
-GangDecoder::GangDecoder(
-		const std::string& url,
-		VideoFrameObserver* video_frame_observer,
-		AudioFrameObserver* audio_frame_observer) :
+GangDecoder::GangDecoder(const std::string& url) :
 				decoder_(::new_gang_decoder(url.c_str())),
-				video_frame_observer_(video_frame_observer),
-				audio_frame_observer_(audio_frame_observer),
-				connected_(false),
-				escape_(100),
-				escaped_(0) {
+				video_frame_observer_(NULL),
+				audio_frame_observer_(NULL),
+				connected_(false) {
 }
 
 GangDecoder::~GangDecoder() {
@@ -32,11 +27,19 @@ void GangDecoder::Stop() {
 bool GangDecoder::Init() {
 	bool ok = !::open_gang_decoder(decoder_);
 	::close_gang_decoder(decoder_);
-	printf("GangDecoder::Init %s\n", ok ? "true" : "false");
+	printf("GangDecoder::Init %s\n", ok ? "ok" : "failed");
 	return ok;
 }
 
-void GangDecoder::GetBestFormat(int* width, int* height, int* fps) {
+bool GangDecoder::IsVideoAvailable() {
+	return !decoder_->no_video;
+}
+
+bool GangDecoder::IsAudioAvailable() {
+	return !decoder_->no_audio;
+}
+
+void GangDecoder::GetVideoInfo(int* width, int* height, int* fps) {
 	*width = decoder_->width;
 	*height = decoder_->height;
 	*fps = decoder_->fps;
@@ -51,7 +54,7 @@ void GangDecoder::Run() {
 	if (!connect()) {
 		return;
 	}
-	while (connected_ && !NextFrameLoop()) {
+	while (connected_ && nextFrameLoop()) {
 	}
 	disconnect();
 }
@@ -73,52 +76,70 @@ bool GangDecoder::Connected() {
 void GangDecoder::disconnect() {
 	rtc::CritScope cs(&crit_);
 	if (connected_) {
-		::close_gang_decoder(decoder_);
-		connected_ = false;
+		stop();
 	}
 }
 
-bool GangDecoder::NextFrameLoop() {
+void GangDecoder::stop() {
+	::close_gang_decoder(decoder_);
+	connected_ = false;
+}
+
+// return true->continue, false->end
+bool GangDecoder::nextFrameLoop() {
 	void *data = 0;
-	// nSamples
+	// or nSamples with audio data
 	int size = 0;
 	switch (::gang_decode_next_frame(decoder_, &data, &size)) {
-	case 1:
+	case GANG_VIDEO_DATA:
 		if (video_frame_observer_)
 			video_frame_observer_->OnVideoFrame(
 					data,
 					static_cast<uint32>(size));
 		break;
-	case 2:
+	case GANG_AUDIO_DATA:
 		if (audio_frame_observer_) {
-			++escaped_;
-			if (escaped_ > escape_) {
-				audio_frame_observer_->OnAudioFrame(
-						data,
-						static_cast<uint32_t>(size));
-			} else {
-				free(data);
-			}
+			audio_frame_observer_->OnAudioFrame(
+					data,
+					static_cast<uint32_t>(size));
 		} else
 			free(data);
 		break;
-	case -1:
-		printf("EOF\n");
-		return true;
-	default:
+	case GANG_EOF: // end loop
+		return false;
+	case GANG_ERROR_DATA: // next
 		break;
+	default: // unexpected, so end loop
+		return false;
 	}
-	return false;
+	return true;
 }
 
-void GangDecoder::SetVideoFrameObserver(
+// Do not call in the running thread
+bool GangDecoder::SetVideoFrameObserver(
 		VideoFrameObserver* video_frame_observer) {
+	rtc::CritScope cs(&crit_);
 	video_frame_observer_ = video_frame_observer;
+	return startOrStop();
 }
 
-void GangDecoder::SetAudioFrameObserver(
+// Do not call in the running thread
+bool GangDecoder::SetAudioFrameObserver(
 		AudioFrameObserver* audio_frame_observer) {
+	rtc::CritScope cs(&crit_);
 	audio_frame_observer_ = audio_frame_observer;
+	return startOrStop();
+}
+
+// return started or start action ok(will be started)
+bool GangDecoder::startOrStop() {
+	if ((video_frame_observer_ || audio_frame_observer_) && !connected_) {
+		return Start();
+	} else if (!video_frame_observer_ && !audio_frame_observer_ && connected_) {
+		// TODO check if recording here
+		stop();
+	}
+	return connected_;
 }
 
 }  // namespace gang

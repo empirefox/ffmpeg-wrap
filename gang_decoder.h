@@ -1,5 +1,5 @@
-#ifndef GANG_GANG_DECODER_HH
-#define GANG_GANG_DECODER_HH
+#ifndef GANG_DECODER_H_
+#define GANG_DECODER_H_
 
 #include "webrtc/base/basictypes.h"
 #include "webrtc/base/constructormagic.h"
@@ -34,10 +34,7 @@ protected:
 
 class GangDecoder: public rtc::Thread {
 public:
-	explicit GangDecoder(
-			const std::string& url,
-			VideoFrameObserver* video_frame_observer = NULL,
-			AudioFrameObserver* audio_frame_observer = NULL);
+	explicit GangDecoder(const std::string& url);
 	~GangDecoder();
 
 	bool Init();
@@ -46,26 +43,26 @@ public:
 	virtual void Stop() override;
 	bool Connected();
 
-	bool NextFrameLoop();
+	bool IsVideoAvailable();
+	bool IsAudioAvailable();
 
-	void SetVideoFrameObserver(VideoFrameObserver* video_frame_observer_);
-	void SetAudioFrameObserver(AudioFrameObserver* audio_frame_observer_);
-	// TODO change to GetVideoInfo
-	void GetBestFormat(int* width, int* height, int* fps);
-	void GetAudioInfo(
-			uint32_t* sample_rate,
-			uint8_t* channels);
+	bool SetVideoFrameObserver(VideoFrameObserver* video_frame_observer_);
+	bool SetAudioFrameObserver(AudioFrameObserver* audio_frame_observer_);
+
+	void GetVideoInfo(int* width, int* height, int* fps);
+	void GetAudioInfo(uint32_t* sample_rate, uint8_t* channels);
 private:
+	bool nextFrameLoop();
 	bool connect();
 	void disconnect();
+	void stop();
+	bool startOrStop();
 	gang_decoder* decoder_;
 	VideoFrameObserver* video_frame_observer_;
 	AudioFrameObserver* audio_frame_observer_;
 
 	mutable rtc::CriticalSection crit_;
 	bool connected_;
-	int escape_;
-	int escaped_;
 
 	DISALLOW_COPY_AND_ASSIGN(GangDecoder);
 };
@@ -73,4 +70,4 @@ private:
 }
 // namespace gang
 
-#endif // GANG_GANG_DECODER_HH
+#endif // GANG_DECODER_H_

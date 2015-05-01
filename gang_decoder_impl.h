@@ -15,6 +15,8 @@ extern "C" {
 
 struct gang_decoder {
 	char *url;
+	int no_video;
+	int no_audio;
 
 	//vidio
 	int width;

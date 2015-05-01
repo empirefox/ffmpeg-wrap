@@ -24,10 +24,6 @@ static const uint32 kAdmMaxIdleTimeProcess = 1000;
 static const int kTotalDelayMs = 0;
 static const int kClockDriftMs = 0;
 
-enum {
-	MSG_START_PROCESS, MSG_RUN_PROCESS, MSG_STOP_PROCESS,
-};
-
 GangAudioDevice::GangAudioDevice() :
 				last_process_time_ms_(0),
 				audio_callback_(NULL),
@@ -617,11 +613,9 @@ bool GangAudioDevice::Initialize(GangDecoder* decoder) {
 }
 
 void GangAudioDevice::OnAudioFrame(void* data, uint32_t nSamples) {
-//	printf("GangAudioDevice::OnAudioFrame(), nSamples:%d\n", nSamples);
 	if (!audio_callback_) {
 		return;
 	}
-//	rec_worker_thread_->Clear(this, MSG_REC_DATA);
 	rec_worker_thread_->Post(
 			this,
 			MSG_REC_DATA,
@@ -649,25 +643,11 @@ int32_t GangAudioDevice::DeliverRecordedData() {
 		_newMicLevel = newMicLevel;
 	}
 
-	//				int32_t ret = audio_callback_->RecordedDataIsAvailable(
-	//						rec_buff_,	// need interleaved data
-	//						nb_samples_10ms_ / channels_, // 10ms samples
-	//						len_bytes_per_sample_,
-	//						channels_,
-	//						sample_rate_ / channels_,
-	//						kTotalDelayMs,
-	//						kClockDriftMs,
-	//						current_mic_level,
-	//						key_pressed,
-	//						current_mic_level);
-	//				if (ret != 0)
-	//					printf("GangAudioDevice::OnMessage(), return:%d\n", ret);
-	//
 	return 0;
 }
 
 // ----------------------------------------------------------------------------
-//  OnMessage
+//  OnRecData
 //
 //  Store recorded audio buffer in local memory ready for the actual
 //  "delivery" using a callback.

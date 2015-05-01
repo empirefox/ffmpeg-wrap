@@ -47,12 +47,6 @@ public:
 		MSG_REC_DATA,
 	};
 
-	// The value for the following constants have been derived by running VoE
-	// using a real ADM. The constants correspond to 10ms of mono audio at 44kHz.
-	enum {
-		kNumberSamples = 440
-	};
-
 	// Creates a GangAudioDevice or returns NULL on failure.
 	// |process_thread| is used to push and pull audio frames to and from the
 	// returned instance. Note: ownership of |process_thread| is not handed over.
@@ -251,6 +245,7 @@ private:
 	AudioDeviceModule::ChannelType _recChannel;
 
 	// 2 or 4 depending on mono or stereo
+	// do not equal BytesPerSample in ffmpeg
 	uint8_t _recBytesPerSample;
 
 	uint32_t _currentMicLevel;
@@ -263,6 +258,7 @@ private:
 
 	uint16_t _record_index;
 };
+
 }  // namespace gang
 
 #endif  // GANG_AUDIO_DEVICE_H

@@ -8,6 +8,8 @@ struct gang_decoder *new_gang_decoder(const char *url) {
 	struct gang_decoder *decoder = (struct gang_decoder*) malloc(
 			sizeof(struct gang_decoder));
 	decoder->url = (char*) url;
+	decoder->no_video = 1;
+	decoder->no_audio = 1;
 
 	decoder->width = 0;
 	decoder->height = 0;
@@ -115,7 +117,7 @@ int open_gang_decoder(struct gang_decoder *decoder) {
 
 	init_gang_video_info(decoder);
 	if (!decoder->swr_ctx) {
-		// Do not need resample, so init info here.
+		// Do not need resample, so init origin info here.
 		init_gang_audio_info(decoder);
 	} else {
 		fprintf(
@@ -142,6 +144,9 @@ int open_gang_decoder(struct gang_decoder *decoder) {
 	if (error) {
 		return error;
 	}
+
+	decoder->no_video = !decoder->video_stream;
+	decoder->no_audio = !decoder->audio_stream;
 	fprintf(stderr, "open_gang_decoder ok\n");
 
 	return 0;
