@@ -142,8 +142,8 @@ int open_gang_decoder(struct gang_decoder *decoder) {
 	decoder->no_audio = !decoder->audio_stream;
 	LOG_DEBUG(
 			"All are prepared with: audio:%d video:%d",
-			decoder->no_video,
-			decoder->no_audio);
+			!decoder->no_video,
+			!decoder->no_audio);
 
 	return 0;
 }
@@ -340,7 +340,7 @@ int gang_decode_next_audio(
 int gang_decode_next_frame(struct gang_decoder* decoder, void **data, int *size) {
 
 	if (av_read_frame(decoder->i_fmt_ctx, &decoder->i_pkt) < 0) {
-		LOG_INFO("av_read_frame error!");
+		LOG_ERROR("av_read_frame error!");
 		// TODO AVERROR_EOF?
 		return GANG_EOF;
 	}
