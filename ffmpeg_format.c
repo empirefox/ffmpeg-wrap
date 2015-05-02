@@ -1,4 +1,5 @@
 #include "ffmpeg_format.h"
+#include "macrologger.h"
 
 /**
  * From transcode_aac.c
@@ -28,9 +29,8 @@ int open_codec_context(
 
 	ret = av_find_best_stream((*input_format_context), type, -1, -1, NULL, 0);
 	if (ret < 0) {
-		fprintf(
-				stderr,
-				"Could not find %s stream in input file '%s'\n",
+		LOG_INFO(
+				"Could not find %s stream in input file '%s'",
 				av_get_media_type_string(type),
 				(*input_format_context)->filename);
 		return ret;
@@ -42,18 +42,12 @@ int open_codec_context(
 		dec_ctx = st->codec;
 		dec = avcodec_find_decoder(dec_ctx->codec_id);
 		if (!dec) {
-			fprintf(
-					stderr,
-					"Failed to find %s codec\n",
-					av_get_media_type_string(type));
+			LOG_INFO("Failed to find %s codec", av_get_media_type_string(type));
 			return AVERROR(EINVAL);
 		}
 
 		if ((ret = avcodec_open2(dec_ctx, dec, NULL)) < 0) {
-			fprintf(
-					stderr,
-					"Failed to open %s codec\n",
-					av_get_media_type_string(type));
+			LOG_INFO("Failed to open %s codec", av_get_media_type_string(type));
 			return ret;
 		}
 		*stream_idx = stream_index;
@@ -77,11 +71,10 @@ int open_input_file(
 	int error, video_stream_idx, audio_stream_idx;
 
 	/** Open the input file to read from it. */
-	if ((error = avformat_open_input(input_format_context, filename, NULL,
-	NULL)) < 0) {
-		fprintf(
-				stderr,
-				"Could not open input file '%s' (error '%s')\n",
+	if ((error = avformat_open_input(input_format_context, filename, NULL, NULL))
+			< 0) {
+		LOG_ERROR(
+				"Could not open input file '%s' (error '%s')",
 				filename,
 				get_error_text(error));
 		*input_format_context = NULL;
@@ -90,9 +83,8 @@ int open_input_file(
 
 	/** Get information on the input file (number of streams etc.). */
 	if ((error = avformat_find_stream_info(*input_format_context, NULL)) < 0) {
-		fprintf(
-				stderr,
-				"Could not open find stream info (error '%s')\n",
+		LOG_INFO(
+				"Could not open find stream info (error '%s')",
 				get_error_text(error));
 		avformat_close_input(input_format_context);
 		return error;
@@ -114,11 +106,12 @@ int open_input_file(
 	}
 
 	if (!(*video_stream) && !(*audio_stream)) {
-		fprintf(
-		stderr, "Could not find any stream\n");
+		LOG_INFO("Could not find any stream");
 		avformat_close_input(input_format_context);
 		return AVERROR(AVERROR_STREAM_NOT_FOUND);
 	}
+
+	LOG_DEBUG("Input file:%s opened.", filename);
 
 	return 0;
 }
@@ -153,11 +146,11 @@ int init_audio_resampler(
 	if (i_chs <= 2 && i_sample_rate <= 96000) {
 		if (i_sample_fmt == AV_SAMPLE_FMT_S16) {
 			*s16_status = AV_SAMPLE_FMT_S16;
-			// return no error
+			LOG_DEBUG("Audio sample is s16, no need resample.");
 			return 0;
 		} else if (i_sample_fmt == AV_SAMPLE_FMT_S16P) {
 			*s16_status = AV_SAMPLE_FMT_S16P;
-			// return no error
+			LOG_DEBUG("Audio sample is s16p, manual change to s16.");
 			return 0;
 		}
 	}
@@ -180,16 +173,26 @@ int init_audio_resampler(
 			0,
 			NULL);
 	if (!(*resample_context)) {
-		fprintf(stderr, "Could not allocate resample context\n");
+		LOG_INFO("Could not allocate resample context");
 		return AVERROR(ENOMEM);
 	}
 
 	/** Open the resampler with the specified parameters. */
 	if ((error = swr_init(*resample_context)) < 0) {
-		fprintf(stderr, "Could not open resample context\n");
+		LOG_INFO("Could not open resample context");
 		swr_free(resample_context);
 		return error;
 	}
+
+	LOG_DEBUG(
+			"Audio resampler inited.\nfrom fmt:%s, channels:%d, rate:%d\nto   fmt:%s, channels:%d, rate:%d",
+			av_get_sample_fmt_name(i_sample_fmt),
+			i_chs,
+			i_sample_rate,
+			av_get_sample_fmt_name(AV_SAMPLE_FMT_S16),
+			*o_chs,
+			*o_sample_rate);
+
 	return 0;
 }
 
@@ -200,7 +203,7 @@ int init_audio_resampler(
  */
 int init_input_frame(AVFrame **frame) {
 	if (!(*frame = av_frame_alloc())) {
-		fprintf(stderr, "Could not allocate input frame\n");
+		LOG_INFO("Could not allocate input frame.");
 		return AVERROR(ENOMEM);
 	}
 	return 0;

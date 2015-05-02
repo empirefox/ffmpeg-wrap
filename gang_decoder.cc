@@ -1,7 +1,9 @@
 #include "gang_decoder.h"
+
+#include <memory>
+
 #include "gang_decoder_impl.h"
-#include <iostream>
-#include <stdio.h>
+#include "spdlog_console.h"
 
 namespace gang {
 
@@ -10,16 +12,17 @@ GangDecoder::GangDecoder(const std::string& url) :
 				video_frame_observer_(NULL),
 				audio_frame_observer_(NULL),
 				connected_(false) {
+	SPDLOG_TRACE(console);
 }
 
 GangDecoder::~GangDecoder() {
-	printf("GangDecoder::~GangDecoder\n");
+	SPDLOG_TRACE(console);
 	Stop();
 	::free_gang_decoder(decoder_);
 }
 
 void GangDecoder::Stop() {
-	printf("GangDecoder::Stop\n");
+	SPDLOG_TRACE(console);
 	disconnect();
 	rtc::Thread::Stop();
 }
@@ -27,7 +30,7 @@ void GangDecoder::Stop() {
 bool GangDecoder::Init() {
 	bool ok = !::open_gang_decoder(decoder_);
 	::close_gang_decoder(decoder_);
-	printf("GangDecoder::Init %s\n", ok ? "ok" : "failed");
+	SPDLOG_TRACE(console, "%s\n", ok ? "ok" : "failed");
 	return ok;
 }
 
@@ -60,6 +63,7 @@ void GangDecoder::Run() {
 }
 
 bool GangDecoder::connect() {
+	SPDLOG_TRACE(console);
 	rtc::CritScope cs(&crit_);
 	if (!connected_) {
 		connected_ = !::open_gang_decoder(decoder_);
@@ -74,6 +78,7 @@ bool GangDecoder::Connected() {
 }
 
 void GangDecoder::disconnect() {
+	SPDLOG_TRACE(console);
 	rtc::CritScope cs(&crit_);
 	if (connected_) {
 		stop();
@@ -92,24 +97,31 @@ bool GangDecoder::nextFrameLoop() {
 	int size = 0;
 	switch (::gang_decode_next_frame(decoder_, &data, &size)) {
 	case GANG_VIDEO_DATA:
-		if (video_frame_observer_)
+		if (video_frame_observer_) {
 			video_frame_observer_->OnVideoFrame(
 					data,
 					static_cast<uint32>(size));
+		} else {
+			free(reinterpret_cast<uint8_t*>(data));
+		}
 		break;
 	case GANG_AUDIO_DATA:
 		if (audio_frame_observer_) {
 			audio_frame_observer_->OnAudioFrame(
 					data,
 					static_cast<uint32_t>(size));
-		} else
-			free(data);
+		} else {
+			free(reinterpret_cast<uint8_t*>(data));
+		}
 		break;
 	case GANG_EOF: // end loop
+		SPDLOG_DEBUG(console, "GANG_EOF");
 		return false;
 	case GANG_ERROR_DATA: // next
+		SPDLOG_TRACE(console);
 		break;
 	default: // unexpected, so end loop
+		console->error("Unknow ret code from decoder!");
 		return false;
 	}
 	return true;
@@ -134,8 +146,10 @@ bool GangDecoder::SetAudioFrameObserver(
 // return started or start action ok(will be started)
 bool GangDecoder::startOrStop() {
 	if ((video_frame_observer_ || audio_frame_observer_) && !connected_) {
+		SPDLOG_DEBUG(console, "Start");
 		return Start();
 	} else if (!video_frame_observer_ && !audio_frame_observer_ && connected_) {
+		SPDLOG_DEBUG(console, "Stop");
 		// TODO check if recording here
 		stop();
 	}

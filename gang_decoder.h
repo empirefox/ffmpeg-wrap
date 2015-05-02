@@ -6,7 +6,7 @@
 #include "webrtc/base/criticalsection.h"
 #include "webrtc/base/thread.h"
 #include "talk/media/base/videocapturer.h"
-#include "gang_decoder.h"
+
 #include "gang_decoder_impl.h"
 
 namespace gang {

@@ -54,6 +54,8 @@ struct gang_decoder {
 	AVFrame *i_frame;
 };
 
+void initialize_gang_decoder_globel();
+
 // create gang_decode with given url
 struct gang_decoder* new_gang_decoder(const char* url);
 

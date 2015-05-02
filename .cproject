@@ -32,6 +32,7 @@
 								<option id="gnu.cpp.compiler.option.dialect.std.1903043781" name="Language standard" superClass="gnu.cpp.compiler.option.dialect.std" value="gnu.cpp.compiler.dialect.c++11" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.option.include.paths.352392696" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="/home/savage/git/webrtcbuilds"/>
+									<listOptionValue builtIn="false" value="/home/savage/git/spdlog/include"/>
 									<listOptionValue builtIn="false" value="/usr/include/jsoncpp"/>
 								</option>
 								<option id="gnu.cpp.compiler.option.preprocessor.def.678380967" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" valueType="definedSymbols">
@@ -47,6 +48,9 @@
 								<option id="gnu.c.compiler.option.dialect.std.1552375508" name="Language standard" superClass="gnu.c.compiler.option.dialect.std" value="gnu.c.compiler.dialect.c99" valueType="enumerated"/>
 								<option id="gnu.c.compiler.option.preprocessor.def.symbols.468442541" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="NO_GANG"/>
+								</option>
+								<option id="gnu.c.compiler.option.include.paths.160628906" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
+									<listOptionValue builtIn="false" value="/home/savage/git/macro-logger"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.1178216951" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
 							</tool>

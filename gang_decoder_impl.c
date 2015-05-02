@@ -1,7 +1,14 @@
-#include <libavutil/imgutils.h>
-
 #include "gang_decoder_impl.h"
+
+#include <libavutil/imgutils.h>
+#include "macrologger.h"
+
 #include "ffmpeg_format.h"
+
+void initialize_gang_decoder_globel() {
+	av_register_all();
+	avformat_network_init();
+}
 
 // create gang_decode with given url
 struct gang_decoder *new_gang_decoder(const char *url) {
@@ -55,19 +62,19 @@ void init_gang_video_info(struct gang_decoder *decoder) {
 		// TODO maybe need calculate it.
 		decoder->fps = 10000;
 	}
-	fprintf(
-			stderr,
-			"init_gang_video_info pix_fmt:%s, fps:%d\n",
+	LOG_DEBUG(
+			"pix_fmt:%s, width:%d, height:%d, fps:%d",
 			av_get_pix_fmt_name(decoder->pix_fmt),
+			decoder->width,
+			decoder->height,
 			decoder->fps);
 }
 
 void init_gang_audio_info(struct gang_decoder *decoder) {
 	decoder->channels = decoder->audio_stream->codec->channels;
 	decoder->sample_rate = decoder->audio_stream->codec->sample_rate;
-	fprintf(
-			stderr,
-			"init_gang_audio_info no resample, channels:%d, sample_rate:%d\n",
+	LOG_DEBUG(
+			"no resample,use origin channels:%d, sample_rate:%d",
 			decoder->channels,
 			decoder->sample_rate);
 }
@@ -83,7 +90,7 @@ int init_gang_video_decode_buffer(struct gang_decoder *decoder) {
 			decoder->pix_fmt,
 			1);
 	if (size < 0) {
-		fprintf(stderr, "Could not allocate raw video buffer\n");
+		LOG_INFO("Could not allocate raw video buffer");
 		return -1;
 	}
 	decoder->video_dst_bufsize = size;
@@ -93,9 +100,6 @@ int init_gang_video_decode_buffer(struct gang_decoder *decoder) {
 // return error
 int open_gang_decoder(struct gang_decoder *decoder) {
 	int error;
-	av_register_all();
-	avformat_network_init();
-
 	error = open_input_file(
 			decoder->url,
 			&decoder->i_fmt_ctx,
@@ -119,17 +123,6 @@ int open_gang_decoder(struct gang_decoder *decoder) {
 	if (!decoder->swr_ctx) {
 		// Do not need resample, so init origin info here.
 		init_gang_audio_info(decoder);
-	} else {
-		fprintf(
-				stderr,
-				"init_gang_audio_info WITH resample, channels:%d, sample_rate:%d\n",
-				decoder->channels,
-				decoder->sample_rate);
-		fprintf(
-				stderr,
-				"origin sample format:%s\n",
-				av_get_sample_fmt_name(
-						decoder->audio_stream->codec->sample_fmt));
 	}
 
 	av_init_packet(&decoder->i_pkt);
@@ -147,7 +140,10 @@ int open_gang_decoder(struct gang_decoder *decoder) {
 
 	decoder->no_video = !decoder->video_stream;
 	decoder->no_audio = !decoder->audio_stream;
-	fprintf(stderr, "open_gang_decoder ok\n");
+	LOG_DEBUG(
+			"All are prepared with: audio:%d video:%d",
+			decoder->no_video,
+			decoder->no_audio);
 
 	return 0;
 }
@@ -168,7 +164,7 @@ void close_gang_decoder(struct gang_decoder *decoder) {
 	av_freep(&decoder->audio_dst_data);
 	if (decoder->i_frame)
 		av_frame_free(&decoder->i_frame);
-	fprintf(stderr, "close_gang_decoder ok\n");
+	LOG_DEBUG("All are released.");
 }
 
 // return error
@@ -182,12 +178,12 @@ int gang_decode_next_video(struct gang_decoder* decoder, void **data, int *size)
 			&decoder->i_pkt);
 
 	if (error < 0) {
-		fprintf(stderr, "Error decoding video frame (%s)\n", av_err2str(error));
+		LOG_INFO("Error decoding video frame (%s)", av_err2str(error));
 		return error;
 	}
 
 	if (!got_picture) {
-		fprintf(stderr, "Cannot decode video frame!\n");
+		LOG_INFO("Cannot decode video frame!");
 		return -1;
 	}
 
@@ -236,9 +232,8 @@ int prepare_resample_buffer(struct gang_decoder* decoder) {
 					0);
 		}
 		if (ret < 0) {
-			fprintf(
-					stderr,
-					"Could not allocate destination samples (%s)\n",
+			LOG_INFO(
+					"Could not allocate destination samples (%s)",
 					av_err2str(ret));
 			return ret;
 		}
@@ -254,7 +249,7 @@ int resample_and_copy(
 	int ret; // error
 
 	if (!decoder->swr_ctx) {
-		fprintf(stderr, "Swr_ctx not inited\n");
+		LOG_INFO("Swr_ctx not inited");
 		return -1;
 	}
 
@@ -271,7 +266,7 @@ int resample_and_copy(
 			(const uint8_t **) decoder->i_frame->extended_data,
 			decoder->i_frame->nb_samples);
 	if (ret < 0) {
-		fprintf(stderr, "Error while converting (%s)\n", av_err2str(ret));
+		LOG_INFO("Error while converting (%s)", av_err2str(ret));
 		return ret;
 	}
 
@@ -282,8 +277,7 @@ int resample_and_copy(
 			AV_SAMPLE_FMT_S16,
 			1);
 	if (dst_bufsize < 0) {
-		fprintf(
-		stderr, "Could not get sample buffer size (%s)\n", av_err2str(ret));
+		LOG_INFO("Could not get sample buffer size (%s)", av_err2str(ret));
 		return ret;
 	}
 
@@ -308,20 +302,19 @@ int gang_decode_next_audio(
 			&got_picture,
 			&decoder->i_pkt);
 	if (error < 0) {
-		fprintf(
-		stderr, "Error decoding audio frame (%s)\n", av_err2str(error));
+		LOG_INFO("Error decoding audio frame (%s)", av_err2str(error));
 		return error;
 	}
 
 	if (!got_picture) {
-		fprintf(stderr, "Cannot decode audio frame!\n");
+		LOG_INFO("Cannot decode audio frame!");
 		return -1;
 	}
 
 	size_t output_linesize = decoder->i_frame->nb_samples
 			* decoder->bytes_per_sample * decoder->channels;
 	if (output_linesize < 1) {
-		fprintf(stderr, "decode audio frame error! length < 1\n");
+		LOG_INFO("decode audio frame error! length < 1");
 		return -1;
 	}
 
@@ -347,7 +340,7 @@ int gang_decode_next_audio(
 int gang_decode_next_frame(struct gang_decoder* decoder, void **data, int *size) {
 
 	if (av_read_frame(decoder->i_fmt_ctx, &decoder->i_pkt) < 0) {
-		fprintf(stderr, "av_read_frame error!\n");
+		LOG_INFO("av_read_frame error!");
 		// TODO AVERROR_EOF?
 		return GANG_EOF;
 	}

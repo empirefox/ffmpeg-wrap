@@ -1,10 +1,11 @@
 #include "gang_audio_device.h"
-#include "webrtc/common_audio/signal_processing/include/signal_processing_library.h"
 
 #include "webrtc/base/common.h"
 #include "webrtc/base/refcount.h"
 #include "webrtc/base/thread.h"
 #include "webrtc/base/timeutils.h"
+
+#include "spdlog_console.h"
 
 using webrtc::CriticalSectionScoped;
 
@@ -46,14 +47,14 @@ GangAudioDevice::GangAudioDevice() :
 				_totalDelayMS(kTotalDelayMs),
 				_clockDrift(kClockDriftMs),
 				_record_index(0) {
-	printf("GangAudioDevice\n");
-	rec_worker_thread_->Start();
 
+	rec_worker_thread_->Start();
 	memset(rec_buff_, 0, kMaxBufferSizeBytes);
+	SPDLOG_TRACE(console);
 }
 
 GangAudioDevice::~GangAudioDevice() {
-	printf("~GangAudioDevice\n");
+	SPDLOG_TRACE(console);
 	// Ensure that thread stops calling ProcessFrame().
 	{
 		CriticalSectionScoped lock(&_critSect);
@@ -63,8 +64,8 @@ GangAudioDevice::~GangAudioDevice() {
 			decoder_ = NULL;
 		}
 		if (rec_worker_thread_) {
-			rec_worker_thread_->Clear(this);
 			rec_worker_thread_->Stop();
+			rec_worker_thread_->Clear(this);
 			delete rec_worker_thread_;
 			rec_worker_thread_ = NULL;
 		}
@@ -81,6 +82,7 @@ rtc::scoped_refptr<GangAudioDevice> GangAudioDevice::Create() {
 }
 
 int64_t GangAudioDevice::TimeUntilNextProcess() {
+	SPDLOG_TRACE(console);
 	const uint32 current_time = rtc::Time();
 	if (current_time < last_process_time_ms_) {
 		// TODO: wraparound could be handled more gracefully.
@@ -94,17 +96,18 @@ int64_t GangAudioDevice::TimeUntilNextProcess() {
 }
 
 int32_t GangAudioDevice::Process() {
-//	printf("GangAudioDevice::Process()\n");
+	SPDLOG_TRACE(console);
 	last_process_time_ms_ = rtc::Time();
 	return 0;
 }
 
 int32_t GangAudioDevice::ActiveAudioLayer(AudioLayer* audio_layer) const {
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 webrtc::AudioDeviceModule::ErrorCode GangAudioDevice::LastError() const {
-	printf("GangAudioDevice::LastError()\n");
+	SPDLOG_TRACE(console);
 	return webrtc::AudioDeviceModule::kAdmErrNone;
 }
 
@@ -112,7 +115,7 @@ int32_t GangAudioDevice::RegisterEventObserver(
 		webrtc::AudioDeviceObserver* event_callback) {
 	// Only used to report warnings and errors. This fake implementation won't
 	// generate any so discard this callback.
-	printf("GangAudioDevice::RegisterEventObserver()\n");
+	SPDLOG_TRACE(console);
 	return 0;
 }
 
@@ -120,34 +123,34 @@ int32_t GangAudioDevice::RegisterAudioCallback(
 		webrtc::AudioTransport* audio_callback) {
 	CriticalSectionScoped lock(&_critSectCb);
 	audio_callback_ = audio_callback;
-	printf("GangAudioDevice::RegisterAudioCallback()\n");
+	SPDLOG_TRACE(console);
 	return 0;
 }
 
 int32_t GangAudioDevice::Init() {
-	printf("GangAudioDevice::Init()\n");
+	SPDLOG_TRACE(console);
 	// Initialize is called by the factory method. Safe to ignore this Init call.
 	return 0;
 }
 
 int32_t GangAudioDevice::Terminate() {
-	printf("GangAudioDevice::Terminate()\n");
+	SPDLOG_TRACE(console);
 	// Clean up in the destructor. No action here, just success.
 	return 0;
 }
 
 bool GangAudioDevice::Initialized() const {
-	printf("GangAudioDevice::Initialized()\n");
+	SPDLOG_TRACE(console);
 	return decoder_ != NULL;
 }
 
 int16_t GangAudioDevice::PlayoutDevices() {
-	printf("GangAudioDevice::PlayoutDevices()\n");
+	SPDLOG_TRACE(console);
 	return 0;
 }
 
 int16_t GangAudioDevice::RecordingDevices() {
-	printf("GangAudioDevice::RecordingDevices()\n");
+	SPDLOG_TRACE(console);
 	return 1;
 }
 
@@ -155,7 +158,7 @@ int32_t GangAudioDevice::PlayoutDeviceName(
 		uint16_t index,
 		char name[webrtc::kAdmMaxDeviceNameSize],
 		char guid[webrtc::kAdmMaxGuidSize]) {
-	printf("GangAudioDevice::PlayoutDeviceName()\n");
+	SPDLOG_TRACE(console);
 	return 0;
 }
 
@@ -164,6 +167,7 @@ int32_t GangAudioDevice::RecordingDeviceName(
 		char name[kAdmMaxDeviceNameSize],
 		char guid[kAdmMaxGuidSize]) {
 
+	SPDLOG_TRACE(console);
 	// TODO give device a actual name
 	const char* kName = "gang_audio_device";
 	const char* kGuid = "gang_audio_unique_id";
@@ -179,17 +183,18 @@ int32_t GangAudioDevice::RecordingDeviceName(
 
 int32_t GangAudioDevice::SetPlayoutDevice(uint16_t index) {
 	// No playout device, just playing from file. Return success.
-	printf("GangAudioDevice::SetPlayoutDevice()\n");
+	SPDLOG_TRACE(console);
 	return 0;
 }
 
 int32_t GangAudioDevice::SetPlayoutDevice(
 		AudioDeviceModule::WindowsDeviceType device) {
-	printf("GangAudioDevice::SetPlayoutDevice()\n");
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 int32_t GangAudioDevice::SetRecordingDevice(uint16_t index) {
+	SPDLOG_TRACE(console);
 	if (index == 0) {
 		_record_index = index;
 		return _record_index;
@@ -199,25 +204,27 @@ int32_t GangAudioDevice::SetRecordingDevice(uint16_t index) {
 
 int32_t GangAudioDevice::SetRecordingDevice(
 		AudioDeviceModule::WindowsDeviceType device) {
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 int32_t GangAudioDevice::PlayoutIsAvailable(bool* available) {
-	printf("GangAudioDevice::PlayoutIsAvailable()\n");
+	SPDLOG_TRACE(console);
 	return 0;
 }
 
 int32_t GangAudioDevice::InitPlayout() {
-	printf("GangAudioDevice::InitPlayout()\n");
+	SPDLOG_TRACE(console);
 	return 0;
 }
 
 bool GangAudioDevice::PlayoutIsInitialized() const {
-	printf("GangAudioDevice::PlayoutIsInitialized()\n");
+	SPDLOG_TRACE(console);
 	return true;
 }
 
 int32_t GangAudioDevice::RecordingIsAvailable(bool* available) {
+	SPDLOG_TRACE(console);
 	if (_record_index == 0) {
 		*available = true;
 		return _record_index;
@@ -227,27 +234,27 @@ int32_t GangAudioDevice::RecordingIsAvailable(bool* available) {
 }
 
 int32_t GangAudioDevice::InitRecording() {
-	printf("GangAudioDevice::InitRecording()\n");
+	SPDLOG_TRACE(console);
 	return 0;
 }
 
 bool GangAudioDevice::RecordingIsInitialized() const {
-	printf("GangAudioDevice::RecordingIsInitialized()\n");
+	SPDLOG_TRACE(console);
 	return true;
 }
 
 int32_t GangAudioDevice::StartPlayout() {
-	printf("GangAudioDevice::StartPlayout()\n");
+	SPDLOG_TRACE(console);
 	return 0;
 }
 
 int32_t GangAudioDevice::StopPlayout() {
-	printf("GangAudioDevice::StopPlayout()\n");
+	SPDLOG_TRACE(console);
 	return 0;
 }
 
 bool GangAudioDevice::Playing() const {
-	printf("GangAudioDevice::Playing()\n");
+	SPDLOG_TRACE(console);
 	return true;
 }
 
@@ -255,8 +262,7 @@ bool GangAudioDevice::Playing() const {
 int32_t GangAudioDevice::StartRecording() {
 	if (!rec_is_initialized_) {
 		return -1;
-	}
-	printf("StartRecording\n");
+	} SPDLOG_DEBUG(console);
 	CriticalSectionScoped lock(&_critSect);
 	recording_ = true;
 	decoder_->SetAudioFrameObserver(this);
@@ -265,7 +271,7 @@ int32_t GangAudioDevice::StartRecording() {
 
 // TODO StopRecording
 int32_t GangAudioDevice::StopRecording() {
-	printf("GangAudioDevice::StopRecording()\n");
+	SPDLOG_DEBUG(console);
 	CriticalSectionScoped lock(&_critSect);
 	recording_ = false;
 	if (decoder_) {
@@ -276,19 +282,19 @@ int32_t GangAudioDevice::StopRecording() {
 }
 
 bool GangAudioDevice::Recording() const {
-	printf("GangAudioDevice::Recording()\n");
+	SPDLOG_TRACE(console);
 	CriticalSectionScoped lock(&_critSect);
 	return recording_;
 }
 
 int32_t GangAudioDevice::SetAGC(bool enable) {
-	printf("GangAudioDevice::SetAGC()\n");
+	SPDLOG_TRACE(console);
 	// No Automatic gain control
 	return -1;
 }
 
 bool GangAudioDevice::AGC() const {
-	printf("GangAudioDevice::AGC()\n");
+	SPDLOG_TRACE(console);
 	return false;
 }
 
@@ -301,137 +307,139 @@ int32_t GangAudioDevice::SetWaveOutVolume(
 int32_t GangAudioDevice::WaveOutVolume(
 		uint16_t* volume_left,
 		uint16_t* volume_right) const {
-	printf("GangAudioDevice::WaveOutVolume()\n");
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 int32_t GangAudioDevice::InitSpeaker() {
-	printf("GangAudioDevice::InitSpeaker()\n");
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 bool GangAudioDevice::SpeakerIsInitialized() const {
-	printf("GangAudioDevice::SpeakerIsInitialized()\n");
+	SPDLOG_TRACE(console);
 	return false;
 }
 
 int32_t GangAudioDevice::InitMicrophone() {
-	printf("GangAudioDevice::InitMicrophone()\n");
+	SPDLOG_TRACE(console);
 	// No microphone, just playing from file. Return success.
 	return 0;
 }
 
 bool GangAudioDevice::MicrophoneIsInitialized() const {
-	printf("GangAudioDevice::MicrophoneIsInitialized()\n");
+	SPDLOG_TRACE(console);
 	return true;
 }
 
 int32_t GangAudioDevice::SpeakerVolumeIsAvailable(bool* available) {
-	printf("GangAudioDevice::SpeakerVolumeIsAvailable()\n");
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 int32_t GangAudioDevice::SetSpeakerVolume(uint32_t /*volume*/) {
-	printf("GangAudioDevice::SetSpeakerVolume()\n");
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 int32_t GangAudioDevice::SpeakerVolume(uint32_t* /*volume*/) const {
-	printf("GangAudioDevice::SpeakerVolume()\n");
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 int32_t GangAudioDevice::MaxSpeakerVolume(uint32_t* /*max_volume*/) const {
-	printf("GangAudioDevice::MaxSpeakerVolume()\n");
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 int32_t GangAudioDevice::MinSpeakerVolume(uint32_t* /*min_volume*/) const {
-	printf("GangAudioDevice::MinSpeakerVolume()\n");
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 int32_t GangAudioDevice::SpeakerVolumeStepSize(uint16_t* /*step_size*/) const {
-	printf("GangAudioDevice::SpeakerVolumeStepSize()\n");
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 int32_t GangAudioDevice::MicrophoneVolumeIsAvailable(bool* available) {
-	printf("GangAudioDevice::MicrophoneVolumeIsAvailable()\n");
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 int32_t GangAudioDevice::SetMicrophoneVolume(uint32_t volume) {
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 int32_t GangAudioDevice::MicrophoneVolume(uint32_t* volume) const {
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 int32_t GangAudioDevice::MaxMicrophoneVolume(uint32_t* max_volume) const {
-//	printf("GangAudioDevice::MaxMicrophoneVolume()\n");
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 int32_t GangAudioDevice::MinMicrophoneVolume(uint32_t* /*min_volume*/) const {
-	printf("GangAudioDevice::MinMicrophoneVolume()\n");
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 int32_t GangAudioDevice::MicrophoneVolumeStepSize(
 		uint16_t* /*step_size*/) const {
-	printf("GangAudioDevice::MicrophoneVolumeStepSize()\n");
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 int32_t GangAudioDevice::SpeakerMuteIsAvailable(bool* /*available*/) {
-	printf("GangAudioDevice::SpeakerMuteIsAvailable()\n");
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 int32_t GangAudioDevice::SetSpeakerMute(bool /*enable*/) {
-	printf("GangAudioDevice::SetSpeakerMute()\n");
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 int32_t GangAudioDevice::SpeakerMute(bool* /*enabled*/) const {
-	printf("GangAudioDevice::SpeakerMute()\n");
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 int32_t GangAudioDevice::MicrophoneMuteIsAvailable(bool* /*available*/) {
-	printf("GangAudioDevice::MicrophoneMuteIsAvailable()\n");
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 int32_t GangAudioDevice::SetMicrophoneMute(bool /*enable*/) {
-	printf("GangAudioDevice::SetMicrophoneMute()\n");
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 int32_t GangAudioDevice::MicrophoneMute(bool* /*enabled*/) const {
-	printf("GangAudioDevice::MicrophoneMute()\n");
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 int32_t GangAudioDevice::MicrophoneBoostIsAvailable(bool* /*available*/) {
-	printf("GangAudioDevice::MicrophoneBoostIsAvailable()\n");
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 int32_t GangAudioDevice::SetMicrophoneBoost(bool /*enable*/) {
-	printf("GangAudioDevice::SetMicrophoneBoost()\n");
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 int32_t GangAudioDevice::MicrophoneBoost(bool* /*enabled*/) const {
-	printf("GangAudioDevice::MicrophoneBoost()\n");
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 int32_t GangAudioDevice::StereoPlayoutIsAvailable(bool* available) const {
-	printf("GangAudioDevice::StereoPlayoutIsAvailable()\n");
+	SPDLOG_TRACE(console);
 	// No recording device, just dropping audio. Stereo can be dropped just
 	// as easily as mono.
 	*available = true;
@@ -439,36 +447,37 @@ int32_t GangAudioDevice::StereoPlayoutIsAvailable(bool* available) const {
 }
 
 int32_t GangAudioDevice::SetStereoPlayout(bool /*enable*/) {
-	printf("GangAudioDevice::SetStereoPlayout()\n");
+	SPDLOG_TRACE(console);
 	// No recording device, just dropping audio. Stereo can be dropped just
 	// as easily as mono.
 	return 0;
 }
 
 int32_t GangAudioDevice::StereoPlayout(bool* /*enabled*/) const {
-	printf("GangAudioDevice::StereoPlayout()\n");
+	SPDLOG_TRACE(console);
 	return 0;
 }
 
 int32_t GangAudioDevice::StereoRecordingIsAvailable(bool* available) const {
-	printf("GangAudioDevice::StereoRecordingIsAvailable()\n");
+	SPDLOG_TRACE(console);
 	// Keep thing simple. No stereo recording.
 	*available = true;
 	return 0;
 }
 
 int32_t GangAudioDevice::SetStereoRecording(bool enable) {
-	printf("GangAudioDevice::SetStereoRecording()\n");
+	SPDLOG_TRACE(console);
 	return 0;
 }
 
 int32_t GangAudioDevice::StereoRecording(bool* enabled) const {
-	printf("GangAudioDevice::StereoRecording()\n");
+	SPDLOG_TRACE(console);
 	*enabled = true;
 	return 0;
 }
 
 int32_t GangAudioDevice::SetRecordingChannel(const ChannelType channel) {
+	SPDLOG_TRACE(console);
 	CriticalSectionScoped lock(&_critSect);
 
 	if (_recChannels == 1) {
@@ -488,6 +497,7 @@ int32_t GangAudioDevice::SetRecordingChannel(const ChannelType channel) {
 }
 
 int32_t GangAudioDevice::RecordingChannel(ChannelType* channel) const {
+	SPDLOG_TRACE(console);
 	*channel = _recChannel;
 	return 0;
 }
@@ -495,62 +505,62 @@ int32_t GangAudioDevice::RecordingChannel(ChannelType* channel) const {
 int32_t GangAudioDevice::SetPlayoutBuffer(
 		const BufferType /*type*/,
 		uint16_t /*size_ms*/) {
-	printf("GangAudioDevice::SetPlayoutBuffer()\n");
+	SPDLOG_TRACE(console);
 	return 0;
 }
 
 int32_t GangAudioDevice::PlayoutBuffer(
 		BufferType* /*type*/,
 		uint16_t* /*size_ms*/) const {
-	printf("GangAudioDevice::PlayoutBuffer()\n");
+	SPDLOG_TRACE(console);
 	return 0;
 }
 
 int32_t GangAudioDevice::PlayoutDelay(uint16_t* delay_ms) const {
-	printf("GangAudioDevice::PlayoutDelay()\n");
+	SPDLOG_TRACE(console);
 	return 0;
 }
 
 int32_t GangAudioDevice::RecordingDelay(uint16_t* /*delay_ms*/) const {
-	printf("GangAudioDevice::RecordingDelay()\n");
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 int32_t GangAudioDevice::CPULoad(uint16_t* /*load*/) const {
-	printf("GangAudioDevice::CPULoad()\n");
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 int32_t GangAudioDevice::StartRawOutputFileRecording(
 		const char /*pcm_file_name_utf8*/[webrtc::kAdmMaxFileNameSize]) {
-	printf("GangAudioDevice::StartRawOutputFileRecording()\n");
+	SPDLOG_TRACE(console);
 	return 0;
 }
 
 int32_t GangAudioDevice::StopRawOutputFileRecording() {
-	printf("GangAudioDevice::StopRawOutputFileRecording()\n");
+	SPDLOG_TRACE(console);
 	return 0;
 }
 
 int32_t GangAudioDevice::StartRawInputFileRecording(
 		const char /*pcm_file_name_utf8*/[webrtc::kAdmMaxFileNameSize]) {
-	printf("GangAudioDevice::StartRawInputFileRecording()\n");
+	SPDLOG_TRACE(console);
 	return 0;
 }
 
 int32_t GangAudioDevice::StopRawInputFileRecording() {
-	printf("GangAudioDevice::StopRawInputFileRecording()\n");
+	SPDLOG_TRACE(console);
 	return 0;
 }
 
 int32_t GangAudioDevice::SetRecordingSampleRate(
 		const uint32_t /*samples_per_sec*/) {
-	printf("GangAudioDevice::SetRecordingSampleRate()\n");
+	SPDLOG_TRACE(console);
 	return 0;
 }
 
 int32_t GangAudioDevice::RecordingSampleRate(uint32_t* samples_per_sec) const {
-	printf("GangAudioDevice::RecordingSampleRate()\n");
+	SPDLOG_TRACE(console);
 	if (_recSampleRate == 0) {
 		return -1;
 	}
@@ -560,34 +570,34 @@ int32_t GangAudioDevice::RecordingSampleRate(uint32_t* samples_per_sec) const {
 
 int32_t GangAudioDevice::SetPlayoutSampleRate(
 		const uint32_t /*samples_per_sec*/) {
-	printf("GangAudioDevice::SetPlayoutSampleRate()\n");
+	SPDLOG_TRACE(console);
 	return 0;
 }
 
 int32_t GangAudioDevice::PlayoutSampleRate(
 		uint32_t* /*samples_per_sec*/) const {
-	printf("GangAudioDevice::PlayoutSampleRate()\n");
+	SPDLOG_TRACE(console);
 	ASSERT(false);
 	return 0;
 }
 
 int32_t GangAudioDevice::ResetAudioDevice() {
-	printf("GangAudioDevice::ResetAudioDevice()\n");
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 int32_t GangAudioDevice::SetLoudspeakerStatus(bool /*enable*/) {
-	printf("GangAudioDevice::SetLoudspeakerStatus()\n");
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 int32_t GangAudioDevice::GetLoudspeakerStatus(bool* /*enabled*/) const {
-	printf("GangAudioDevice::GetLoudspeakerStatus()\n");
+	SPDLOG_TRACE(console);
 	return -1;
 }
 
 bool GangAudioDevice::Initialize(GangDecoder* decoder) {
-	printf("GangAudioDevice::Initialize(GangDecoder* decoder) \n");
+	SPDLOG_DEBUG(console);
 	if (!decoder) {
 		return false;
 	}
@@ -598,8 +608,8 @@ bool GangAudioDevice::Initialize(GangDecoder* decoder) {
 	_recBytesPerSample = 2 * _recChannels; // 16 bits per sample in mono, 32 bits in stereo
 	nb_samples_10ms_ = _recSampleRate / 100; // must fix to rate
 
-	printf(
-			"rate: %d, channels: %d, bytesPerSample: %d\n",
+	SPDLOG_DEBUG(console,
+			"For webrtc, rate: {}, channels: {}, bytesPerSample: {}",
 			_recSampleRate,
 			_recChannels,
 			_recBytesPerSample);
@@ -607,7 +617,6 @@ bool GangAudioDevice::Initialize(GangDecoder* decoder) {
 	// init rec_rest_buff_ 10ms container
 	len_bytes_per_10ms_ = nb_samples_10ms_ * _recBytesPerSample;
 
-	WebRtcSpl_Init();
 	rec_is_initialized_ = true;
 	return true;
 }

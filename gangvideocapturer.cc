@@ -1,13 +1,17 @@
 #include "gangvideocapturer.h"
 
+#include "spdlog_console.h"
+
 namespace gang {
 
 GangVideoCapturer::GangVideoCapturer() :
 				gang_thread_(NULL),
 				start_time_ns_(0) {
+	SPDLOG_TRACE(console);
 }
 
 GangVideoCapturer::~GangVideoCapturer() {
+	SPDLOG_TRACE(console);
 	Stop();
 	if (gang_thread_) {
 		gang_thread_ = NULL;
@@ -16,6 +20,7 @@ GangVideoCapturer::~GangVideoCapturer() {
 }
 
 void GangVideoCapturer::Initialize(GangDecoder* gang_thread) {
+	SPDLOG_DEBUG(console);
 	gang_thread_ = gang_thread;
 	int width;
 	int height;
@@ -56,12 +61,14 @@ CaptureState GangVideoCapturer::Start(const VideoFormat& capture_format) {
 	start_time_ns_ = static_cast<int64>(rtc::TimeNanos());
 
 	if (gang_thread_ && gang_thread_->SetVideoFrameObserver(this)) {
+		SPDLOG_DEBUG(console,"OK");
 		return cricket::CS_RUNNING;
-	}
+	} SPDLOG_DEBUG(console,"Failed");
 	return cricket::CS_FAILED;
 }
 
 void GangVideoCapturer::Stop() {
+	SPDLOG_DEBUG(console);
 	SetCaptureFormat(NULL);
 	if (gang_thread_) {
 		gang_thread_->SetVideoFrameObserver(NULL);
