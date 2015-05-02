@@ -30,7 +30,7 @@ void GangDecoder::Stop() {
 bool GangDecoder::Init() {
 	bool ok = !::open_gang_decoder(decoder_);
 	::close_gang_decoder(decoder_);
-	SPDLOG_TRACE(console, "%s\n", ok ? "ok" : "failed");
+	SPDLOG_TRACE(console, ok ? "ok" : "failed");
 	return ok;
 }
 
@@ -92,27 +92,27 @@ void GangDecoder::stop() {
 
 // return true->continue, false->end
 bool GangDecoder::nextFrameLoop() {
-	void *data = 0;
+	uint8_t *data = 0;
 	// or nSamples with audio data
 	int size = 0;
 	switch (::gang_decode_next_frame(decoder_, &data, &size)) {
 	case GANG_VIDEO_DATA:
 		if (video_frame_observer_) {
 			video_frame_observer_->OnVideoFrame(
-					data,
+					reinterpret_cast<void*>(data),
 					static_cast<uint32>(size));
 		} else {
-			free(reinterpret_cast<uint8_t*>(data));
+			free(data);
 		}
 		break;
 	case GANG_AUDIO_DATA:
-		if (audio_frame_observer_) {
-			audio_frame_observer_->OnAudioFrame(
-					data,
-					static_cast<uint32_t>(size));
-		} else {
-			free(reinterpret_cast<uint8_t*>(data));
+		if (audio_frame_observer_
+				&& audio_frame_observer_->OnAudioFrame(
+						data,
+						static_cast<uint32_t>(size))) {
+			break;
 		}
+		free(data);
 		break;
 	case GANG_EOF: // end loop
 		SPDLOG_DEBUG(console, "GANG_EOF");
@@ -121,7 +121,7 @@ bool GangDecoder::nextFrameLoop() {
 		SPDLOG_TRACE(console);
 		break;
 	default: // unexpected, so end loop
-		console->error("Unknow ret code from decoder!");
+		console->error() << "Unknow ret code from decoder!";
 		return false;
 	}
 	return true;

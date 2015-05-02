@@ -25,6 +25,15 @@ static const uint32 kAdmMaxIdleTimeProcess = 1000;
 static const int kTotalDelayMs = 0;
 static const int kClockDriftMs = 0;
 
+SampleData::SampleData(uint8_t* _data, uint32_t _nSamples) :
+				data(_data),
+				nSamples(_nSamples) {
+}
+
+SampleData::~SampleData() {
+	free(data);
+}
+
 GangAudioDevice::GangAudioDevice() :
 				last_process_time_ms_(0),
 				audio_callback_(NULL),
@@ -262,7 +271,7 @@ bool GangAudioDevice::Playing() const {
 int32_t GangAudioDevice::StartRecording() {
 	if (!rec_is_initialized_) {
 		return -1;
-	} SPDLOG_DEBUG(console);
+	}SPDLOG_DEBUG(console);
 	CriticalSectionScoped lock(&_critSect);
 	recording_ = true;
 	decoder_->SetAudioFrameObserver(this);
@@ -621,14 +630,15 @@ bool GangAudioDevice::Initialize(GangDecoder* decoder) {
 	return true;
 }
 
-void GangAudioDevice::OnAudioFrame(void* data, uint32_t nSamples) {
+bool GangAudioDevice::OnAudioFrame(uint8_t* data, uint32_t nSamples) {
 	if (!audio_callback_) {
-		return;
+		return false;
 	}
 	rec_worker_thread_->Post(
 			this,
 			MSG_REC_DATA,
-			new SampleData(data, nSamples));
+			new SampleMsgData(new SampleData(data, nSamples)));
+	return true;
 }
 
 // ----------------------------------------------------------------------------
@@ -669,7 +679,7 @@ int32_t GangAudioDevice::DeliverRecordedData() {
 //  16-bit,48kHz mono,  10ms => nSamples=480 => _recSize=2*480=960 bytes
 //  16-bit,48kHz stereo,10ms => nSamples=480 => _recSize=4*480=1920 bytes
 // ----------------------------------------------------------------------------
-void GangAudioDevice::OnRecData(int8_t* data, uint32_t nSamples) {
+void GangAudioDevice::OnRecData(uint8_t* data, uint32_t nSamples) {
 
 	uint32_t nb_src_bytes = nSamples * _recBytesPerSample;
 	uint32_t src_index = 0;
@@ -702,12 +712,10 @@ void GangAudioDevice::OnMessage(rtc::Message* msg) {
 	switch (msg->message_id) {
 	case MSG_REC_DATA:
 		CriticalSectionScoped lock(&_critSectCb);
-		SampleData* msg_data = static_cast<SampleData*>(msg->pdata);
-		int8_t* data = reinterpret_cast<int8_t*>(msg_data->data_);
-		uint32_t nSamples = msg_data->nSamples_;
-		OnRecData(data, nSamples);
-		free(data);
-		delete msg_data;
+		rtc::scoped_ptr<SampleMsgData> pdata(
+				static_cast<SampleMsgData*>(msg->pdata));
+		SampleData* data = pdata->data().get();
+		OnRecData(data->data, data->nSamples);
 		break;
 	}
 }

@@ -37,6 +37,10 @@
 								</option>
 								<option id="gnu.cpp.compiler.option.preprocessor.def.678380967" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="WEBRTC_POSIX"/>
+									<listOptionValue builtIn="false" value="SPDLOG_DEBUG_ON"/>
+									<listOptionValue builtIn="false" value="SPDLOG_TRACE_ON"/>
+									<listOptionValue builtIn="false" value="SPDLOG_NO_DATETIME"/>
+									<listOptionValue builtIn="false" value="GANG_INFO_ON"/>
 									<listOptionValue builtIn="false" value="POSIX"/>
 									<listOptionValue builtIn="false" value="__GXX_EXPERIMENTAL_CXX0X__"/>
 								</option>

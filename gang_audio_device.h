@@ -27,21 +27,20 @@ namespace gang {
 
 const uint32_t kMaxBufferSizeBytes = 3840; // 10ms in stereo @ 96kHz
 
+class SampleData {
+public:
+	uint8_t* data;
+	uint32_t nSamples;
+	SampleData(uint8_t* _data, uint32_t _nSamples);
+	~SampleData();
+};
+
+typedef rtc::ScopedMessageData<SampleData> SampleMsgData;
+
 class GangAudioDevice: public AudioDeviceModule,
 		public AudioFrameObserver,
 		rtc::MessageHandler {
 public:
-
-	class SampleData: public rtc::MessageData {
-	public:
-		void* data_;
-		uint32_t nSamples_;
-
-		SampleData(void* data, uint32_t nSamples) :
-						data_(data),
-						nSamples_(nSamples) {
-		}
-	};
 
 	enum {
 		MSG_REC_DATA,
@@ -196,11 +195,11 @@ public:
 
 	int32_t DeliverRecordedData();
 
-	void OnRecData(int8_t* data, uint32_t nSamples);
+	void OnRecData(uint8_t* data, uint32_t nSamples);
 
 	virtual void OnMessage(rtc::Message* msg) override;
 
-	virtual void OnAudioFrame(void* data, uint32_t nSamples) override;
+	virtual bool OnAudioFrame(uint8_t* data, uint32_t nSamples) override;
 
 protected:
 	// The constructor is protected because the class needs to be created as a
@@ -229,7 +228,7 @@ private:
 	// User provided thread context.
 	GangDecoder* decoder_;
 	// 10ms in stereo @ 96kHz
-	int8_t rec_buff_[kMaxBufferSizeBytes];
+	uint8_t rec_buff_[kMaxBufferSizeBytes];
 	int rec_buff_index_;
 	int len_bytes_per_10ms_;
 	int nb_samples_10ms_;

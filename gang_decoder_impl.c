@@ -168,7 +168,7 @@ void close_gang_decoder(struct gang_decoder *decoder) {
 }
 
 // return error
-int gang_decode_next_video(struct gang_decoder* decoder, void **data, int *size) {
+int gang_decode_next_video(struct gang_decoder* decoder, uint8_t **data, int *size) {
 
 	int error, got_picture = 0;
 	error = avcodec_decode_video2(
@@ -244,7 +244,7 @@ int prepare_resample_buffer(struct gang_decoder* decoder) {
 
 int resample_and_copy(
 		struct gang_decoder* decoder,
-		void **data,
+		uint8_t **data,
 		int *nb_samples) {
 	int ret; // error
 
@@ -292,7 +292,7 @@ int resample_and_copy(
 // return error
 int gang_decode_next_audio(
 		struct gang_decoder* decoder,
-		void **data,
+		uint8_t **data,
 		int *nb_samples) {
 
 	int error, got_picture = 0;
@@ -337,7 +337,7 @@ int gang_decode_next_audio(
 /**
  * return: -1->EOF, 0->error, 1->video, 2->audio
  */
-int gang_decode_next_frame(struct gang_decoder* decoder, void **data, int *size) {
+int gang_decode_next_frame(struct gang_decoder* decoder, uint8_t **data, int *size) {
 
 	if (av_read_frame(decoder->i_fmt_ctx, &decoder->i_pkt) < 0) {
 		LOG_ERROR("av_read_frame error!");

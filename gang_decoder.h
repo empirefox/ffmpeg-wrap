@@ -25,8 +25,8 @@ protected:
 // need be shared_ptr
 class AudioFrameObserver {
 public:
-	// signal data int16_t*
-	virtual void OnAudioFrame(void* data, uint32_t nSamples) = 0;
+	// return true if data has been freed
+	virtual bool OnAudioFrame(uint8_t* data, uint32_t nSamples) = 0;
 protected:
 	~AudioFrameObserver() {
 	}

@@ -81,7 +81,7 @@ void close_gang_decoder(struct gang_decoder* decoder);
 // return: -1->EOF, 0->error, 1->video, 2->audio
 int gang_decode_next_frame(
 		struct gang_decoder* decoder,
-		void **data,
+		uint8_t **data,
 		int *size);
 
 #ifdef __cplusplus
