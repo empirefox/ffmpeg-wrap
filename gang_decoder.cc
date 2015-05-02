@@ -3,7 +3,7 @@
 #include <memory>
 
 #include "gang_decoder_impl.h"
-#include "spdlog_console.h"
+#include "gang_spdlog_console.h"
 
 namespace gang {
 

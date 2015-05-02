@@ -1,6 +1,6 @@
 #include "gangvideocapturer.h"
 
-#include "spdlog_console.h"
+#include "gang_spdlog_console.h"
 
 namespace gang {
 

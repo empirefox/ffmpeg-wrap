@@ -5,7 +5,7 @@
 #include "webrtc/base/thread.h"
 #include "webrtc/base/timeutils.h"
 
-#include "spdlog_console.h"
+#include "gang_spdlog_console.h"
 
 using webrtc::CriticalSectionScoped;
 
