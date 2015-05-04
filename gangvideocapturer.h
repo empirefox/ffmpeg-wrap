@@ -14,10 +14,9 @@ namespace gang {
 // Simulated video capturer that reads frames from a url.
 class GangVideoCapturer: public VideoCapturer, public VideoFrameObserver {
 public:
-	GangVideoCapturer();
 	virtual ~GangVideoCapturer();
 
-	void Initialize(GangDecoder* gang_thread);
+	static GangVideoCapturer* Create(GangDecoder* gang_thread);
 
 	// Override virtual methods of parent class VideoCapturer.
 	virtual CaptureState Start(const VideoFormat& capture_format);
@@ -32,6 +31,8 @@ public:
 	virtual void OnVideoFrame(void* data, uint32 size);
 
 protected:
+	GangVideoCapturer(GangDecoder* gang_thread);
+	void Initialize();
 	// Override virtual methods of parent class VideoCapturer.
 	virtual bool GetPreferredFourccs(std::vector<uint32>* fourccs);
 

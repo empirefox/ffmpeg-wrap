@@ -4,8 +4,8 @@
 
 namespace gang {
 
-GangVideoCapturer::GangVideoCapturer() :
-				gang_thread_(NULL),
+GangVideoCapturer::GangVideoCapturer(GangDecoder* gang_thread) :
+				gang_thread_(gang_thread),
 				start_time_ns_(0) {
 	SPDLOG_TRACE(console);
 }
@@ -19,9 +19,18 @@ GangVideoCapturer::~GangVideoCapturer() {
 	delete[] static_cast<uint8*>(captured_frame_.data);
 }
 
-void GangVideoCapturer::Initialize(GangDecoder* gang_thread) {
+GangVideoCapturer* GangVideoCapturer::Create(GangDecoder* gang_thread) {
+	std::unique_ptr<GangVideoCapturer> capturer(
+			new GangVideoCapturer(gang_thread));
+	if (!capturer.get()) {
+		return NULL;
+	}
+	capturer->Initialize();
+	return capturer.release();
+}
+
+void GangVideoCapturer::Initialize() {
 	SPDLOG_DEBUG(console);
-	gang_thread_ = gang_thread;
 	int width;
 	int height;
 	int fps;
@@ -63,7 +72,7 @@ CaptureState GangVideoCapturer::Start(const VideoFormat& capture_format) {
 	if (gang_thread_ && gang_thread_->SetVideoFrameObserver(this)) {
 		SPDLOG_DEBUG(console,"OK");
 		return cricket::CS_RUNNING;
-	} SPDLOG_DEBUG(console,"Failed");
+	}SPDLOG_DEBUG(console,"Failed");
 	return cricket::CS_FAILED;
 }
 

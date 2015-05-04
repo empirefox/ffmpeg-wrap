@@ -6,7 +6,7 @@
 #include "webrtc/base/scoped_ref_ptr.h"
 #include "webrtc/common_types.h"
 #include "webrtc/modules/audio_device/include/audio_device.h"
-#include "webrtc/system_wrappers/interface/critical_section_wrapper.h"
+#include "webrtc/base/criticalsection.h"
 #include "gang_decoder.h"
 
 namespace rtc {
@@ -18,7 +18,6 @@ class Thread;
 using webrtc::AudioDeviceModule;
 using webrtc::AudioTransport;
 using webrtc::AudioDeviceObserver;
-using webrtc::CriticalSectionWrapper;
 using webrtc::kAdmMaxDeviceNameSize;
 using webrtc::kAdmMaxFileNameSize;
 using webrtc::kAdmMaxGuidSize;
@@ -49,7 +48,9 @@ public:
 	// Creates a GangAudioDevice or returns NULL on failure.
 	// |process_thread| is used to push and pull audio frames to and from the
 	// returned instance. Note: ownership of |process_thread| is not handed over.
-	static rtc::scoped_refptr<GangAudioDevice> Create();
+	static rtc::scoped_refptr<GangAudioDevice> Create(
+			GangDecoder* decoder,
+			int stop_ref_count = 0);
 
 	// Following functions are inherited from webrtc::AudioDeviceModule.
 	// Only functions called by PeerConnection are implemented, the rest do
@@ -191,7 +192,6 @@ public:
 		return -1;
 	}
 	// End of functions inherited from webrtc::AudioDeviceModule.
-	bool Initialize(GangDecoder* decoder);
 
 	int32_t DeliverRecordedData();
 
@@ -201,18 +201,27 @@ public:
 
 	virtual bool OnAudioFrame(uint8_t* data, uint32_t nSamples) override;
 
+	virtual int AddRef();
+	virtual int Release();
+
 protected:
 	// The constructor is protected because the class needs to be created as a
 	// reference counted object (for memory managment reasons). It could be
 	// exposed in which case the burden of proper instantiation would be put on
 	// the creator of a GangAudioDevice instance. To create an instance of
 	// this class use the Create(..) API.
-	explicit GangAudioDevice();
+	explicit GangAudioDevice(GangDecoder* decoder, int stop_ref_count);
 	// The destructor is protected because it is reference counted and should not
 	// be deleted directly.
 	virtual ~GangAudioDevice();
 
+	volatile int ref_count_;
+
+	int stop_ref_count_;
+
 private:
+
+	void Initialize();
 
 	// The time in milliseconds when Process() was last called or 0 if no call
 	// has been made.
@@ -235,8 +244,9 @@ private:
 
 	rtc::Thread* rec_worker_thread_;
 
-	CriticalSectionWrapper& _critSect;
-	CriticalSectionWrapper& _critSectCb;
+	mutable rtc::CriticalSection lock_;
+	mutable rtc::CriticalSection lockCb_;
+
 	uint32_t _recSampleRate;
 	uint8_t _recChannels;
 

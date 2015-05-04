@@ -86,6 +86,7 @@ void GangDecoder::disconnect() {
 }
 
 void GangDecoder::stop() {
+	SPDLOG_DEBUG(console, "Stop");
 	::close_gang_decoder(decoder_);
 	connected_ = false;
 }
@@ -132,7 +133,14 @@ bool GangDecoder::SetVideoFrameObserver(
 		VideoFrameObserver* video_frame_observer) {
 	rtc::CritScope cs(&crit_);
 	video_frame_observer_ = video_frame_observer;
-	return startOrStop();
+	if (video_frame_observer_) {
+		SPDLOG_DEBUG(console, "Start");
+		return connected_ || Start();
+	}
+	if (!audio_frame_observer_ && connected_) {
+		stop();
+	}
+	return false;
 }
 
 // Do not call in the running thread
@@ -140,20 +148,14 @@ bool GangDecoder::SetAudioFrameObserver(
 		AudioFrameObserver* audio_frame_observer) {
 	rtc::CritScope cs(&crit_);
 	audio_frame_observer_ = audio_frame_observer;
-	return startOrStop();
-}
-
-// return started or start action ok(will be started)
-bool GangDecoder::startOrStop() {
-	if ((video_frame_observer_ || audio_frame_observer_) && !connected_) {
+	if (audio_frame_observer_) {
 		SPDLOG_DEBUG(console, "Start");
-		return Start();
-	} else if (!video_frame_observer_ && !audio_frame_observer_ && connected_) {
-		SPDLOG_DEBUG(console, "Stop");
-		// TODO check if recording here
+		return connected_ || Start();
+	}
+	if (!video_frame_observer_ && connected_) {
 		stop();
 	}
-	return connected_;
+	return false;
 }
 
 }  // namespace gang

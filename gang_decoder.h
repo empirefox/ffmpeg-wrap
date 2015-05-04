@@ -56,7 +56,6 @@ private:
 	bool connect();
 	void disconnect();
 	void stop();
-	bool startOrStop();
 	gang_decoder* decoder_;
 	VideoFrameObserver* video_frame_observer_;
 	AudioFrameObserver* audio_frame_observer_;
