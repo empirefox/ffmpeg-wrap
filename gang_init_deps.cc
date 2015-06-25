@@ -15,12 +15,13 @@
 namespace gang {
 
 void InitializeGangDecoderGlobel() {
+	InitGangSpdlogConsole();
 	::initialize_gang_decoder_globel();
 	WebRtcSpl_Init();
-	InitGangSpdlogConsole();
 }
 
 void CleanupGangDecoderGlobel() {
+	::cleanup_gang_decoder_globel();
 	CleanupGangSpdlog();
 }
 

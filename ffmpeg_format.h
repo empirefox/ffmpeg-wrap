@@ -52,7 +52,7 @@ int init_audio_resampler(
 		enum AVSampleFormat *s16_status);
 
 /** Initialize one audio frame for reading from the input file */
-int init_input_frame(AVFrame **frame);
+int init_frame(AVFrame **frame);
 
 void s16p_2_s16(uint8_t* dst, AVFrame *src_frame, int channels);
 

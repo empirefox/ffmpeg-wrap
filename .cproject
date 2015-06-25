@@ -59,7 +59,10 @@
 							</tool>
 							<tool id="cdt.managedbuild.tool.gnu.c.linker.exe.debug.2063082999" name="GCC C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.exe.debug"/>
 							<tool commandLinePattern="${COMMAND} ${INPUTS} ${FLAGS} ${OUTPUT_FLAG} ${OUTPUT_PREFIX}${OUTPUT}" id="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug.949449406" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug">
-								<option id="gnu.cpp.link.option.flags.1734819435" name="Linker flags" superClass="gnu.cpp.link.option.flags" value="`pkg-config --libs --define-variable=prefix=/home/savage/soft/webrtc/webrtc-linux64 libwebrtc_full` `pkg-config --libs nss x11 libavcodec libavformat`" valueType="string"/>
+								<option id="gnu.cpp.link.option.flags.1734819435" name="Linker flags" superClass="gnu.cpp.link.option.flags" value="`pkg-config --libs nss x11 libavcodec libavformat libavfilter libswresample` -lwebrtc_full -lstdc++ -lX11 -lpthread -lrt -ldl" valueType="string"/>
+								<option id="gnu.cpp.link.option.paths.2114092535" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" valueType="libPaths">
+									<listOptionValue builtIn="false" value="/home/savage/soft/webrtc/webrtc-linux64/lib/Release"/>
+								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.887905346" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
 									<additionalInput kind="additionalinput" paths="$(LIBS)"/>
@@ -71,7 +74,7 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry excluding="main.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+						<entry excluding="test/gang_impl_rec_only_test_main.cc|test/gang_impl_rec_only_test_main.c|main.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>
@@ -119,7 +122,7 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry excluding="main.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+						<entry excluding="test/gang_impl_rec_only_test_main.cc|test/gang_impl_rec_only_test_main.c|main.c" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>

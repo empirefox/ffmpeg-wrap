@@ -71,37 +71,25 @@ int open_input_file(
 	int error, video_stream_idx, audio_stream_idx;
 
 	/** Open the input file to read from it. */
-	if ((error = avformat_open_input(input_format_context, filename, NULL, NULL))
-			< 0) {
-		LOG_ERROR(
-				"Could not open input file '%s' (error '%s')",
-				filename,
-				get_error_text(error));
+	if ((error = avformat_open_input(input_format_context, filename, NULL, NULL)) < 0) {
+		LOG_ERROR("Could not open input file '%s' (error '%s')", filename, get_error_text(error));
 		*input_format_context = NULL;
 		return error;
 	}
 
 	/** Get information on the input file (number of streams etc.). */
 	if ((error = avformat_find_stream_info(*input_format_context, NULL)) < 0) {
-		LOG_INFO(
-				"Could not open find stream info (error '%s')",
-				get_error_text(error));
+		LOG_INFO("Could not open find stream info (error '%s')", get_error_text(error));
 		avformat_close_input(input_format_context);
 		return error;
 	}
 
 	// From demuxing_decoding.c
-	if (open_codec_context(
-			&video_stream_idx,
-			input_format_context,
-			AVMEDIA_TYPE_VIDEO) >= 0) {
+	if (open_codec_context(&video_stream_idx, input_format_context, AVMEDIA_TYPE_VIDEO) >= 0) {
 		*video_stream = (*input_format_context)->streams[video_stream_idx];
 	}
 
-	if (open_codec_context(
-			&audio_stream_idx,
-			input_format_context,
-			AVMEDIA_TYPE_AUDIO) >= 0) {
+	if (open_codec_context(&audio_stream_idx, input_format_context, AVMEDIA_TYPE_AUDIO) >= 0) {
 		*audio_stream = (*input_format_context)->streams[audio_stream_idx];
 	}
 
@@ -201,7 +189,7 @@ int init_audio_resampler(
  * return error
  * Initialize one audio frame for reading from the input file
  */
-int init_input_frame(AVFrame **frame) {
+int init_frame(AVFrame **frame) {
 	if (!(*frame = av_frame_alloc())) {
 		LOG_INFO("Could not allocate input frame.");
 		return AVERROR(ENOMEM);
@@ -213,10 +201,7 @@ void s16p_2_s16(uint8_t* dst, AVFrame *src_frame, int channels) {
 	int i, ch, bytesPerSample = 2;
 	for (i = 0; i < src_frame->nb_samples; i++) {
 		for (ch = 0; ch < channels; ++ch) {
-			memcpy(
-					dst,
-					src_frame->data[ch] + bytesPerSample * i,
-					bytesPerSample);
+			memcpy(dst, src_frame->data[ch] + bytesPerSample * i, bytesPerSample);
 			dst += bytesPerSample;
 		}
 	}

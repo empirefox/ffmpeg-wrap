@@ -1,360 +1,370 @@
 #include "gang_decoder_impl.h"
 
+#include <libavfilter/avfilter.h>
+#include <libavfilter/buffersink.h>
+#include <libavfilter/buffersrc.h>
 #include <libavutil/imgutils.h>
 #include "macrologger.h"
 
+#include "ffmpeg_transcoding.h"
 #include "ffmpeg_format.h"
 
 void initialize_gang_decoder_globel() {
+    avcodec_register_all();
 	av_register_all();
 	avformat_network_init();
+	avfilter_register_all();
+}
+
+void cleanup_gang_decoder_globel() {
+	avformat_network_deinit();
 }
 
 // create gang_decode with given url
-struct gang_decoder *new_gang_decoder(const char *url) {
-	struct gang_decoder *decoder = (struct gang_decoder*) malloc(
-			sizeof(struct gang_decoder));
-	decoder->url = (char*) url;
-	decoder->no_video = 1;
-	decoder->no_audio = 1;
+gang_decoder *new_gang_decoder(const char *url, const char *rec_name, int record_enabled) {
+	gang_decoder *dec = (gang_decoder*) malloc(sizeof(gang_decoder));
+	if (dec) {
+		dec->url = av_strdup(url);
+		dec->rec_name = av_strdup(rec_name);
+		dec->rec_enabled = record_enabled;
+		dec->no_video = 1;
+		dec->no_audio = 1;
 
-	decoder->width = 0;
-	decoder->height = 0;
-	decoder->fps = 0;
-	decoder->pix_fmt = AV_PIX_FMT_NONE;
+		dec->width = 0;
+		dec->height = 0;
+		dec->fps = 0;
+		dec->pix_fmt = AV_PIX_FMT_NONE;
 
-	decoder->channels = 0;
-	decoder->sample_rate = 0;
-	decoder->bytes_per_sample = 2; // always output s16
-	decoder->s16_status = AV_SAMPLE_FMT_NONE;
+		dec->channels = 0;
+		dec->sample_rate = 0;
+		dec->bytes_per_sample = 2; // always output s16
 
-	decoder->video_dst_data[0] = NULL;
-	decoder->video_dst_bufsize = 0;
+		dec->video_dst_data[0] = NULL;
+		dec->video_dst_bufsize = 0;
 
-	decoder->audio_dst_data = NULL;
-	decoder->audio_dst_max_nb_samples = 0;
-	decoder->audio_dst_linesize = 0;
-	decoder->audio_dst_nb_samples = 0;
+		dec->ifmt_ctx = NULL;
+		dec->ofmt_ctx = NULL;
+		dec->fscs = NULL;
+		dec->fsc_size = 0;
 
-	decoder->i_fmt_ctx = NULL;
-	decoder->swr_ctx = NULL;
-
-	decoder->video_stream = NULL;
-	decoder->audio_stream = NULL;
-
-	decoder->i_frame = NULL;
-
-	return decoder;
-}
-
-void free_gang_decoder(struct gang_decoder *decoder) {
-	free(decoder);
-}
-
-void init_gang_video_info(struct gang_decoder *decoder) {
-	decoder->pix_fmt = decoder->video_stream->codec->pix_fmt;
-	decoder->width = decoder->video_stream->codec->width;
-	decoder->height = decoder->video_stream->codec->height;
-	AVRational rate = decoder->video_stream->r_frame_rate;
-	if (rate.den) {
-		decoder->fps = rate.num / rate.den;
-	} else {
-		// TODO maybe need calculate it.
-		decoder->fps = 10000;
+		dec->i_frame = NULL;
+		dec->o_frame = NULL;
 	}
-	LOG_DEBUG(
-			"pix_fmt:%s, width:%d, height:%d, fps:%d",
-			av_get_pix_fmt_name(decoder->pix_fmt),
-			decoder->width,
-			decoder->height,
-			decoder->fps);
+
+	return dec;
 }
 
-void init_gang_audio_info(struct gang_decoder *decoder) {
-	decoder->channels = decoder->audio_stream->codec->channels;
-	decoder->sample_rate = decoder->audio_stream->codec->sample_rate;
-	LOG_DEBUG(
-			"no resample,use origin channels:%d, sample_rate:%d",
-			decoder->channels,
-			decoder->sample_rate);
+void free_gang_decoder(gang_decoder *dec) {
+	if (dec) {
+		free(dec->url);
+		free(dec->rec_name);
+		free(dec);
+	}
+	LOG_DEBUG("free_gang_decoder ok");
+}
+
+static void init_av_info(gang_decoder *dec) {
+	FilterStreamContext fsc;
+	int i;
+	for (i = 0; i < dec->fsc_size; i++) {
+		fsc = dec->fscs[i];
+		if (fsc.is_video) {
+			dec->no_video = 0;
+			dec->pix_fmt = fsc.os->codec->pix_fmt;
+			dec->width = fsc.os->codec->width;
+			dec->height = fsc.os->codec->height;
+			AVRational rate = fsc.os->r_frame_rate;
+			if (rate.den) {
+				dec->fps = rate.num / rate.den;
+			} else {
+				// TODO maybe need calculate it.
+				dec->fps = 10000;
+			}
+			LOG_DEBUG(
+					"pix_fmt:%s, width:%d, height:%d, fps:%d",
+					av_get_pix_fmt_name(dec->pix_fmt),
+					dec->width,
+					dec->height,
+					dec->fps);
+		} else {
+			dec->no_audio = 0;
+			dec->channels = fsc.os->codec->channels;
+			dec->sample_rate = fsc.os->codec->sample_rate;
+			LOG_DEBUG("channels:%d, sample_rate:%d", dec->channels, dec->sample_rate);
+		}
+	}
 }
 
 // return error
-int init_gang_video_decode_buffer(struct gang_decoder *decoder) {
+static int init_gang_video_decode_buffer(gang_decoder *dec) {
 	/* allocate image where the decoded image will be put */
 	int size = av_image_alloc(
-			decoder->video_dst_data,
-			decoder->video_dst_linesize,
-			decoder->width,
-			decoder->height,
-			decoder->pix_fmt,
+			dec->video_dst_data,
+			dec->video_dst_linesize,
+			dec->width,
+			dec->height,
+			dec->pix_fmt,
 			1);
 	if (size < 0) {
 		LOG_INFO("Could not allocate raw video buffer");
 		return -1;
 	}
-	decoder->video_dst_bufsize = size;
+	dec->video_dst_bufsize = size;
 	return 0;
+}
+
+int init_gang_av_info(gang_decoder *dec) {
+	int err;
+	err = open_input_streams(dec->url, &dec->ifmt_ctx, &dec->fscs, &dec->fsc_size);
+	if (!err)
+		err = open_output_streams(dec->rec_name, &dec->ofmt_ctx, dec->fscs, dec->fsc_size, 0);
+	if (!err)
+		init_av_info(dec);
+	close_gang_decoder(dec);
+	return err;
 }
 
 // return error
-int open_gang_decoder(struct gang_decoder *decoder) {
-	int error;
-	error = open_input_file(
-			decoder->url,
-			&decoder->i_fmt_ctx,
-			&decoder->video_stream,
-			&decoder->audio_stream);
-	if (error) {
-		return error;
+int open_gang_decoder(gang_decoder *dec) {
+	int err;
+
+	err = open_input_streams(dec->url, &dec->ifmt_ctx, &dec->fscs, &dec->fsc_size);
+	if (!err)
+		err = open_output_streams(
+				dec->rec_name,
+				&dec->ofmt_ctx,
+				dec->fscs,
+				dec->fsc_size,
+				dec->rec_enabled);
+	if (!err)
+		err = init_filters(dec->fscs, dec->fsc_size);
+	if (!err)
+		err = init_gang_video_decode_buffer(dec);
+	if (!err)
+		err = init_frame(&dec->i_frame);
+	if (!err)
+		err = init_frame(&dec->o_frame);
+	if (err) {
+		return err;
 	}
 
-	error = init_audio_resampler(
-			decoder->audio_stream->codec,
-			&decoder->swr_ctx,
-			&decoder->channels,
-			&decoder->sample_rate,
-			&decoder->s16_status);
-	if (error) {
-		return error;
-	}
-
-	init_gang_video_info(decoder);
-	if (!decoder->swr_ctx) {
-		// Do not need resample, so init origin info here.
-		init_gang_audio_info(decoder);
-	}
-
-	av_init_packet(&decoder->i_pkt);
-
-	// must be called after init_gang_video_info
-	error = init_gang_video_decode_buffer(decoder);
-	if (error) {
-		return error;
-	}
-
-	error = init_input_frame(&decoder->i_frame);
-	if (error) {
-		return error;
-	}
-
-	decoder->no_video = !decoder->video_stream;
-	decoder->no_audio = !decoder->audio_stream;
-	LOG_DEBUG(
-			"All are prepared with: audio:%d video:%d",
-			!decoder->no_video,
-			!decoder->no_audio);
-
+	LOG_DEBUG("All are prepared with: audio:%d video:%d", !dec->no_video, !dec->no_audio);
 	return 0;
 }
 
-void close_gang_decoder(struct gang_decoder *decoder) {
-	if (decoder->i_fmt_ctx)
-		avformat_close_input(&decoder->i_fmt_ctx);
+void close_gang_decoder(gang_decoder *dec) {
+	int i;
+
+	av_free_packet(&dec->i_pkt);
+	av_free_packet(&dec->o_pkt);
+	if (dec->o_frame) {
+		av_frame_unref(dec->o_frame);
+		av_frame_free(&dec->o_frame);
+	}
+	if (dec->i_frame) {
+		av_frame_unref(dec->i_frame);
+		av_frame_free(&dec->i_frame);
+	}
+	if (dec->ifmt_ctx) {
+		for (i = 0; i < dec->ifmt_ctx->nb_streams; i++) {
+			avcodec_close(dec->ifmt_ctx->streams[i]->codec);
+		}
+		avformat_close_input(&dec->ifmt_ctx);
+	}
+	LOG_DEBUG("ifmt_ctx");
+	if (dec->ofmt_ctx) {
+		for (i = 0; i < dec->ofmt_ctx->nb_streams; i++) {
+			avcodec_close(dec->ofmt_ctx->streams[i]->codec);
+		}
+		if (dec->rec_enabled && !(dec->ofmt_ctx->oformat->flags & AVFMT_NOFILE))
+			avio_closep(&dec->ofmt_ctx->pb);
+		avformat_free_context(dec->ofmt_ctx);
+	}
+	LOG_DEBUG("ofmt_ctx");
+	if (dec->fscs) {
+		for (i = 0; i < dec->fsc_size; i++) {
+			if (dec->fscs[i].filter_graph) {
+				free(dec->fscs[i].filter_spec);
+				avfilter_graph_free(&dec->fscs[i].filter_graph);
+			}
+		}
+		av_freep(&dec->fscs);
+	}
+	LOG_DEBUG("fscs");
+
 	// free av_image_alloc
-	if (decoder->video_dst_data[0])
-		av_free(decoder->video_dst_data[0]);
-	decoder->video_stream = NULL;
-	decoder->audio_stream = NULL;
-	// free SwrContext
-	if (decoder->swr_ctx)
-		swr_free(&decoder->swr_ctx);
-	if (decoder->audio_dst_data)
-		av_freep(&decoder->audio_dst_data[0]);
-	av_freep(&decoder->audio_dst_data);
-	if (decoder->i_frame)
-		av_frame_free(&decoder->i_frame);
+	if (dec->video_dst_data[0])
+		av_freep(&dec->video_dst_data[0]);
 	LOG_DEBUG("All are released.");
 }
 
-// return error
-int gang_decode_next_video(struct gang_decoder* decoder, uint8_t **data, int *size) {
-
-	int error, got_picture = 0;
-	error = avcodec_decode_video2(
-			decoder->video_stream->codec,
-			decoder->i_frame,
-			&got_picture,
-			&decoder->i_pkt);
-
-	if (error < 0) {
-		LOG_INFO("Error decoding video frame (%s)", av_err2str(error));
-		return error;
-	}
-
-	if (!got_picture) {
-		LOG_INFO("Cannot decode video frame!");
-		return -1;
-	}
-
-	av_image_copy(
-			decoder->video_dst_data,
-			decoder->video_dst_linesize,
-			(const uint8_t **) (decoder->i_frame->data),
-			decoder->i_frame->linesize,
-			decoder->pix_fmt,
-			decoder->width,
-			decoder->height);
-
-	*data = (uint8_t*) malloc(decoder->video_dst_bufsize);
-	memcpy(*data, decoder->video_dst_data[0], decoder->video_dst_bufsize);
-	*size = decoder->video_dst_bufsize;
-
-	return 0;
-}
-
-int prepare_resample_buffer(struct gang_decoder* decoder) {
-	int ret; // error
-
-	decoder->audio_dst_nb_samples = av_rescale_rnd(
-			decoder->i_frame->nb_samples,
-			decoder->sample_rate,
-			decoder->audio_stream->codec->sample_rate,
-			AV_ROUND_UP);
-
-	if (decoder->audio_dst_nb_samples > decoder->audio_dst_max_nb_samples) {
-		if (decoder->audio_dst_data) {
-			av_freep(&decoder->audio_dst_data[0]);
-			ret = av_samples_alloc(
-					decoder->audio_dst_data,
-					&decoder->audio_dst_linesize,
-					decoder->channels,
-					decoder->audio_dst_nb_samples,
-					AV_SAMPLE_FMT_S16,
-					1);
-		} else {
-			ret = av_samples_alloc_array_and_samples(
-					&decoder->audio_dst_data,
-					&decoder->audio_dst_linesize,
-					decoder->channels,
-					decoder->audio_dst_nb_samples,
-					AV_SAMPLE_FMT_S16,
-					0);
-		}
-		if (ret < 0) {
-			LOG_INFO(
-					"Could not allocate destination samples (%s)",
-					av_err2str(ret));
-			return ret;
-		}
-		decoder->audio_dst_max_nb_samples = decoder->audio_dst_nb_samples;
-	}
-	return 0;
-}
-
-int resample_and_copy(
-		struct gang_decoder* decoder,
-		uint8_t **data,
-		int *nb_samples) {
-	int ret; // error
-
-	if (!decoder->swr_ctx) {
-		LOG_INFO("Swr_ctx not inited");
-		return -1;
-	}
-
-	ret = prepare_resample_buffer(decoder);
-	if (ret < 0) {
-		return ret;
-	}
-
-	/* convert to destination format */
-	ret = swr_convert(
-			decoder->swr_ctx,
-			decoder->audio_dst_data,
-			decoder->audio_dst_nb_samples,
-			(const uint8_t **) decoder->i_frame->extended_data,
-			decoder->i_frame->nb_samples);
-	if (ret < 0) {
-		LOG_INFO("Error while converting (%s)", av_err2str(ret));
-		return ret;
-	}
-
-	int dst_bufsize = av_samples_get_buffer_size(
-			&decoder->audio_dst_linesize,
-			decoder->channels,
-			ret, // output nb_samples
-			AV_SAMPLE_FMT_S16,
-			1);
-	if (dst_bufsize < 0) {
-		LOG_INFO("Could not get sample buffer size (%s)", av_err2str(ret));
-		return ret;
-	}
-
-	uint8_t* tmp = (uint8_t*) malloc(dst_bufsize);
-	memcpy(tmp, decoder->audio_dst_data[0], dst_bufsize);
-
-	*data = tmp;
-	*nb_samples = decoder->audio_dst_nb_samples;
-	return 0;
-}
-
-// return error
-int gang_decode_next_audio(
-		struct gang_decoder* decoder,
-		uint8_t **data,
-		int *nb_samples) {
-
-	int error, got_picture = 0;
-	error = avcodec_decode_audio4(
-			decoder->audio_stream->codec,
-			decoder->i_frame,
-			&got_picture,
-			&decoder->i_pkt);
-	if (error < 0) {
-		LOG_INFO("Error decoding audio frame (%s)", av_err2str(error));
-		return error;
-	}
-
-	if (!got_picture) {
-		LOG_INFO("Cannot decode audio frame!");
-		return -1;
-	}
-
-	size_t output_linesize = decoder->i_frame->nb_samples
-			* decoder->bytes_per_sample * decoder->channels;
+static int copy_send_audio_frame(gang_decoder* dec, uint8_t **data, int *nb_samples) {
+	size_t output_linesize = dec->o_frame->nb_samples * dec->bytes_per_sample * dec->channels;
 	if (output_linesize < 1) {
 		LOG_INFO("decode audio frame error! length < 1");
 		return -1;
 	}
 
-	if (decoder->s16_status == AV_SAMPLE_FMT_NONE) {
-		return resample_and_copy(decoder, data, nb_samples);
+	*data = (uint8_t*) malloc(output_linesize);
+	if (!(*data)) {
+		return AVERROR(ENOMEM);
 	}
-
-	uint8_t* tmp = (uint8_t*) malloc(output_linesize);
-	if (decoder->s16_status == AV_SAMPLE_FMT_S16P) {
-		s16p_2_s16(tmp, decoder->i_frame, decoder->channels);
-	} else {
-		memcpy(tmp, decoder->i_frame->extended_data[0], output_linesize);
-	}
-
-	*data = tmp;
-	*nb_samples = decoder->i_frame->nb_samples;
+	memcpy(*data, dec->o_frame->extended_data[0], output_linesize);
+	*nb_samples = dec->o_frame->nb_samples;
 	return 0;
 }
 
-/**
- * return: -1->EOF, 0->error, 1->video, 2->audio
- */
-int gang_decode_next_frame(struct gang_decoder* decoder, uint8_t **data, int *size) {
+static int copy_send_video_frame(gang_decoder* dec, uint8_t **data, int *size) {
+	av_image_copy(
+			dec->video_dst_data,
+			dec->video_dst_linesize,
+			(const uint8_t **) (dec->o_frame->data),
+			dec->o_frame->linesize,
+			dec->pix_fmt,
+			dec->width,
+			dec->height);
 
-	if (av_read_frame(decoder->i_fmt_ctx, &decoder->i_pkt) < 0) {
+	*data = (uint8_t*) malloc(dec->video_dst_bufsize);
+	if (!(*data)) {
+		return AVERROR(ENOMEM);
+	}
+	memcpy(*data, dec->video_dst_data[0], dec->video_dst_bufsize);
+	*size = dec->video_dst_bufsize;
+	return 0;
+}
+
+// From transcoding.c
+// When flushing, i_frame must be set NULL.
+// So we do not auto get i_frame from dec.
+static int filter_encode_write_frame(
+		gang_decoder* dec,
+		uint8_t **data,
+		int *nb_size,
+		FilterStreamContext *fsc,
+		AVFrame *i_frame) {
+
+	int ret;
+
+	/* push the decoded frame into the filtergraph */
+	ret = av_buffersrc_add_frame_flags(fsc->buffersrc_ctx, i_frame, 0);
+	if (ret < 0) {
+		av_log(NULL, AV_LOG_ERROR, "Error while feeding the filtergraph\n");
+		return ret;
+	}
+
+	/* pull filtered frames from the filtergraph */
+	while (1) {
+		av_frame_unref(dec->o_frame);
+		// av_log(NULL, AV_LOG_INFO, "Pulling filtered frame from filters\n");
+		ret = av_buffersink_get_frame(fsc->buffersink_ctx, dec->o_frame);
+		if (ret < 0) {
+			/* if no more frames for output - returns AVERROR(EAGAIN)
+			 * if flushed and no more frames for output - returns AVERROR_EOF
+			 * rewrite retcode to 0 to show it as normal procedure completion
+			 */
+			if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
+				ret = 0;
+			break;
+		}
+
+		dec->o_frame->pict_type = AV_PICTURE_TYPE_NONE;
+
+		// send data to rtc
+		if (data) {
+			if (fsc->is_video)
+				ret = copy_send_video_frame(dec, data, nb_size);
+			else
+				ret = copy_send_audio_frame(dec, data, nb_size);
+			data = NULL;
+			if (ret < 0)
+				break;
+		}
+
+		// write to record file
+		if (dec->rec_enabled) {
+			ret = encode_write_frame(dec, fsc, NULL);
+			if (ret < 0)
+				break;
+		}
+	}
+
+	return ret;
+}
+
+/**
+ * return: -1->FITAL, 0->error, 1->video, 2->audio
+ */
+int gang_decode_next_frame(gang_decoder* dec, uint8_t **data, int *nb_size) {
+	FilterStreamContext fsc;
+	AVStream *is;
+	int got_frame;
+	int fs_index;
+	int (*dec_func)(AVCodecContext*, AVFrame*, int*, const AVPacket*);
+	int err;
+
+	av_free_packet(&dec->i_pkt);
+	av_init_packet(&dec->i_pkt);
+	if (av_read_frame(dec->ifmt_ctx, &dec->i_pkt) < 0) {
 		LOG_ERROR("av_read_frame error!");
 		// TODO AVERROR_EOF?
-		return GANG_EOF;
+		return GANG_FITAL;
 	}
 
-	if (decoder->video_stream
-			&& decoder->video_stream->index == decoder->i_pkt.stream_index
-			&& !gang_decode_next_video(decoder, data, size)) {
-		av_free_packet(&decoder->i_pkt);
-		return GANG_VIDEO_DATA;
-	} else if (decoder->audio_stream
-			&& decoder->audio_stream->index == decoder->i_pkt.stream_index
-			&& !gang_decode_next_audio(decoder, data, size)) {
-		av_free_packet(&decoder->i_pkt);
-		return GANG_AUDIO_DATA;
+	err = find_fs_index(&fs_index, dec->fscs, dec->fsc_size, dec->i_pkt.stream_index);
+	if (err < 0) {
+		return GANG_ERROR_DATA;
 	}
+
+	fsc = dec->fscs[fs_index];
+	is = fsc.is;
+
+	av_packet_rescale_ts(&dec->i_pkt, is->time_base, is->codec->time_base);
+	av_frame_unref(dec->i_frame);
+	dec_func = fsc.is_video ? avcodec_decode_video2 : avcodec_decode_audio4;
+	err = dec_func(is->codec, dec->i_frame, &got_frame, &dec->i_pkt);
+	if (err < 0) {
+		av_log(NULL, AV_LOG_ERROR, "Decoding failed\n");
+		return GANG_ERROR_DATA;
+	}
+
+	if (got_frame) {
+		dec->i_frame->pts = av_frame_get_best_effort_timestamp(dec->i_frame);
+		err = filter_encode_write_frame(dec, data, nb_size, &fsc, dec->i_frame);
+		if (err < 0)
+			return GANG_FITAL;
+		return data ? (fsc.is_video ? GANG_VIDEO_DATA : GANG_AUDIO_DATA) : GANG_ERROR_DATA;
+	}
+
 	return GANG_ERROR_DATA;
+}
+
+int flush_gang_rec_encoder(gang_decoder* dec) {
+	int i;
+	int ret;
+
+	if (!dec->rec_enabled) {
+		return 0;
+	}
+	/* flush filters and encoders */
+	for (i = 0; i < dec->fsc_size; i++) {
+		/* flush filter */
+		if (!dec->fscs[i].filter_graph) {
+			continue;
+		}
+		ret = filter_encode_write_frame(dec, NULL, 0, &dec->fscs[i], NULL);
+		if (ret < 0) {
+			av_log(NULL, AV_LOG_ERROR, "Flushing filter failed\n");
+			return ret;
+		}
+
+		/* flush encoder */
+		ret = flush_encoder(dec, &dec->fscs[i]);
+		if (ret < 0) {
+			av_log(NULL, AV_LOG_ERROR, "Flushing encoder failed\n");
+			return ret;
+		}
+	}
+
+	ret = av_write_trailer(dec->ofmt_ctx);
+	return ret;
 }

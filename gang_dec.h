@@ -1,0 +1,70 @@
+/*
+ * gang_dec.h
+ *
+ *  Created on: Jun 22, 2015
+ *      Author: savage
+ */
+
+#ifndef GANG_DEC_H_
+#define GANG_DEC_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include <stdint.h>
+#include <libavcodec/avcodec.h>
+#include <libavfilter/avfiltergraph.h>
+#include <libavformat/avformat.h>
+#include <libavutil/frame.h>
+
+typedef struct FilterStreamContext {
+	int is_video;
+	char *filter_spec;
+	AVFilterContext *buffersink_ctx;
+	AVFilterContext *buffersrc_ctx;
+	AVFilterGraph *filter_graph;
+	AVStream *os;
+	AVStream *is;
+	enum AVCodecID enc_id;
+} FilterStreamContext;
+
+typedef struct gang_decoder {
+	char *url;
+	char *rec_name;
+	int rec_enabled;
+	int no_video;
+	int no_audio;
+
+	//vidio
+	int width;
+	int height;
+	int fps;
+	enum AVPixelFormat pix_fmt;
+
+	// audio
+	int sample_rate;
+	int channels;
+	int bytes_per_sample;
+
+	// video decode buff
+	uint8_t *video_dst_data[4];
+	int video_dst_linesize[4];
+	int video_dst_bufsize;
+
+	AVFormatContext *ifmt_ctx;
+	AVFormatContext *ofmt_ctx;
+	FilterStreamContext *fscs;
+	size_t fsc_size;
+
+	AVPacket i_pkt;
+	AVPacket o_pkt;
+	AVFrame *i_frame;
+	AVFrame *o_frame;
+} gang_decoder;
+
+#ifdef __cplusplus
+} // closing brace for extern "C"
+#endif
+
+#endif /* GANG_DEC_H_ */

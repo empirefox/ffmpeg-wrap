@@ -7,7 +7,7 @@
 #include "webrtc/base/thread.h"
 #include "talk/media/base/videocapturer.h"
 
-#include "gang_decoder_impl.h"
+#include "gang_dec.h"
 
 namespace gang {
 
@@ -34,7 +34,7 @@ protected:
 
 class GangDecoder: public rtc::Thread {
 public:
-	explicit GangDecoder(const std::string& url);
+	explicit GangDecoder(const std::string& url, const std::string& rec_name, bool rec_enabled);
 	~GangDecoder();
 
 	bool Init();
@@ -51,17 +51,22 @@ public:
 
 	void GetVideoInfo(int* width, int* height, int* fps);
 	void GetAudioInfo(uint32_t* sample_rate, uint8_t* channels);
+
+	void SetRecordEnabled(bool enabled);
+
 private:
 	bool nextFrameLoop();
 	bool connect();
 	void disconnect();
-	void stop();
+	void stop(bool force);
+
 	gang_decoder* decoder_;
 	VideoFrameObserver* video_frame_observer_;
 	AudioFrameObserver* audio_frame_observer_;
 
 	mutable rtc::CriticalSection crit_;
 	bool connected_;
+	bool rec_enabled_;
 
 	DISALLOW_COPY_AND_ASSIGN(GangDecoder);
 };
