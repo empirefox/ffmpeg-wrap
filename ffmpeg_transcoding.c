@@ -54,7 +54,7 @@ static char *timed_name(char *name, const char *short_name) {
 	return name;
 }
 
-static int normalize_opus_rate(int r) {
+int normalize_opus_rate(int r) {
 	return r >= 44100 ?
 			48000 : (r >= 24000 ? 24000 : (r >= 16000 ? 16000 : (r >= 12000 ? 12000 : 8000)));
 }

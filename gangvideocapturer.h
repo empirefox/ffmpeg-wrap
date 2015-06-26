@@ -12,7 +12,7 @@ using cricket::CapturedFrame;
 namespace gang {
 
 // Simulated video capturer that reads frames from a url.
-class GangVideoCapturer: public VideoCapturer, public VideoFrameObserver {
+class GangVideoCapturer: public VideoCapturer, public GangFrameObserver {
 public:
 	virtual ~GangVideoCapturer();
 
@@ -28,7 +28,7 @@ public:
 
 	// Implements VideoFrameObserver
 	// data uint8*
-	virtual void OnVideoFrame();
+	virtual void OnGangFrame();
 
 protected:
 	GangVideoCapturer(GangDecoder* gang_thread);

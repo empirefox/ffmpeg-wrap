@@ -49,7 +49,9 @@ typedef struct gang_decoder {
 
 	// video decode buff
 	uint8_t *video_buff;
-	int video_dst_bufsize;
+	uint8_t *audio_buff;
+	int video_buff_size;
+	int audio_buff_size;
 
 	AVFormatContext *ifmt_ctx;
 	AVFormatContext *ofmt_ctx;

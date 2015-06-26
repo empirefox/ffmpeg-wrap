@@ -36,9 +36,7 @@ public:
 
 typedef rtc::ScopedMessageData<SampleData> SampleMsgData;
 
-class GangAudioDevice: public AudioDeviceModule,
-		public AudioFrameObserver,
-		rtc::MessageHandler {
+class GangAudioDevice: public AudioDeviceModule, public GangFrameObserver, rtc::MessageHandler {
 public:
 
 	enum {
@@ -48,9 +46,7 @@ public:
 	// Creates a GangAudioDevice or returns NULL on failure.
 	// |process_thread| is used to push and pull audio frames to and from the
 	// returned instance. Note: ownership of |process_thread| is not handed over.
-	static rtc::scoped_refptr<GangAudioDevice> Create(
-			GangDecoder* decoder,
-			int stop_ref_count = 0);
+	static rtc::scoped_refptr<GangAudioDevice> Create(GangDecoder* decoder, int stop_ref_count = 0);
 
 	// Following functions are inherited from webrtc::AudioDeviceModule.
 	// Only functions called by PeerConnection are implemented, the rest do
@@ -59,16 +55,13 @@ public:
 	int64_t TimeUntilNextProcess() override;
 	int32_t Process() override;
 
-	int32_t ActiveAudioLayer(AudioDeviceModule::AudioLayer* audio_layer) const
-			override;
+	int32_t ActiveAudioLayer(AudioDeviceModule::AudioLayer* audio_layer) const override;
 
 	AudioDeviceModule::ErrorCode LastError() const override;
-	int32_t RegisterEventObserver(webrtc::AudioDeviceObserver* event_callback)
-			override;
+	int32_t RegisterEventObserver(webrtc::AudioDeviceObserver* event_callback) override;
 
 	// Note: Calling this method from a callback may result in deadlock.
-	int32_t RegisterAudioCallback(webrtc::AudioTransport* audio_callback)
-			override;
+	int32_t RegisterAudioCallback(webrtc::AudioTransport* audio_callback) override;
 
 	int32_t Init() override;
 	int32_t Terminate() override;
@@ -86,11 +79,9 @@ public:
 			char guid[webrtc::kAdmMaxGuidSize]) override;
 
 	int32_t SetPlayoutDevice(uint16_t index) override;
-	int32_t SetPlayoutDevice(AudioDeviceModule::WindowsDeviceType device)
-			override;
+	int32_t SetPlayoutDevice(AudioDeviceModule::WindowsDeviceType device) override;
 	int32_t SetRecordingDevice(uint16_t index) override;
-	int32_t SetRecordingDevice(AudioDeviceModule::WindowsDeviceType device)
-			override;
+	int32_t SetRecordingDevice(AudioDeviceModule::WindowsDeviceType device) override;
 
 	int32_t PlayoutIsAvailable(bool* available) override;
 	int32_t InitPlayout() override;
@@ -109,10 +100,8 @@ public:
 	int32_t SetAGC(bool enable) override;
 	bool AGC() const override;
 
-	int32_t SetWaveOutVolume(uint16_t volume_left, uint16_t volume_right)
-			override;
-	int32_t WaveOutVolume(uint16_t* volume_left, uint16_t* volume_right) const
-			override;
+	int32_t SetWaveOutVolume(uint16_t volume_left, uint16_t volume_right) override;
+	int32_t WaveOutVolume(uint16_t* volume_left, uint16_t* volume_right) const override;
 
 	int32_t InitSpeaker() override;
 	bool SpeakerIsInitialized() const override;
@@ -152,29 +141,22 @@ public:
 	int32_t StereoRecordingIsAvailable(bool* available) const override;
 	int32_t SetStereoRecording(bool enable) override;
 	int32_t StereoRecording(bool* enabled) const override;
-	int32_t SetRecordingChannel(const AudioDeviceModule::ChannelType channel)
-			override;
-	int32_t RecordingChannel(AudioDeviceModule::ChannelType* channel) const
-			override;
+	int32_t SetRecordingChannel(const AudioDeviceModule::ChannelType channel) override;
+	int32_t RecordingChannel(AudioDeviceModule::ChannelType* channel) const override;
 
-	int32_t SetPlayoutBuffer(
-			const AudioDeviceModule::BufferType type,
-			uint16_t size_ms = 0) override;
-	int32_t PlayoutBuffer(
-			AudioDeviceModule::BufferType* type,
-			uint16_t* size_ms) const override;
+	int32_t SetPlayoutBuffer(const AudioDeviceModule::BufferType type, uint16_t size_ms = 0)
+			override;
+	int32_t PlayoutBuffer(AudioDeviceModule::BufferType* type, uint16_t* size_ms) const override;
 	int32_t PlayoutDelay(uint16_t* delay_ms) const override;
 	int32_t RecordingDelay(uint16_t* delay_ms) const override;
 
 	int32_t CPULoad(uint16_t* load) const override;
 
-	int32_t StartRawOutputFileRecording(
-			const char pcm_file_name_utf8[webrtc::kAdmMaxFileNameSize])
-					override;
+	int32_t StartRawOutputFileRecording(const char pcm_file_name_utf8[webrtc::kAdmMaxFileNameSize])
+			override;
 	int32_t StopRawOutputFileRecording() override;
-	int32_t StartRawInputFileRecording(
-			const char pcm_file_name_utf8[webrtc::kAdmMaxFileNameSize])
-					override;
+	int32_t StartRawInputFileRecording(const char pcm_file_name_utf8[webrtc::kAdmMaxFileNameSize])
+			override;
 	int32_t StopRawInputFileRecording() override;
 
 	int32_t SetRecordingSampleRate(const uint32_t samples_per_sec) override;
@@ -199,7 +181,7 @@ public:
 
 	virtual void OnMessage(rtc::Message* msg) override;
 
-	virtual void OnAudioFrame(uint8_t* data, uint32_t nSamples) override;
+	virtual void OnGangFrame() override;
 
 	virtual int AddRef();
 	virtual int Release();

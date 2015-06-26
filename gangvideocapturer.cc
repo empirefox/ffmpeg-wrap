@@ -93,7 +93,7 @@ bool GangVideoCapturer::IsRunning() {
 	return gang_thread_ && gang_thread_->Connected();
 }
 
-void GangVideoCapturer::OnVideoFrame() {
+void GangVideoCapturer::OnGangFrame() {
 	captured_frame_.time_stamp = static_cast<int64>(rtc::TimeNanos());
 	captured_frame_.elapsed_time = captured_frame_.time_stamp - start_time_ns_;
 

@@ -39,7 +39,7 @@ void close_gang_decoder(gang_decoder* dec);
 // output: *data, need allocate and assign to **data.(do not free it)
 //         size
 // return: -1->EOF, 0->error, 1->video, 2->audio
-int gang_decode_next_frame(gang_decoder* dec, uint8_t **data, int *nb_size);
+int gang_decode_next_frame(gang_decoder* dec);
 
 int flush_gang_rec_encoder(gang_decoder* dec);
 

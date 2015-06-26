@@ -67,7 +67,7 @@ GangAudioDevice::~GangAudioDevice() {
 		rtc::CritScope cs(&lock_);
 
 		if (decoder_) {
-			decoder_->SetAudioFrameObserver(NULL);
+			decoder_->SetAudioFrameObserver(NULL, NULL);
 			decoder_ = NULL;
 		}
 		if (rec_worker_thread_) {
@@ -121,16 +121,14 @@ webrtc::AudioDeviceModule::ErrorCode GangAudioDevice::LastError() const {
 	return webrtc::AudioDeviceModule::kAdmErrNone;
 }
 
-int32_t GangAudioDevice::RegisterEventObserver(
-		webrtc::AudioDeviceObserver* event_callback) {
+int32_t GangAudioDevice::RegisterEventObserver(webrtc::AudioDeviceObserver* event_callback) {
 	// Only used to report warnings and errors. This fake implementation won't
 	// generate any so discard this callback.
 	SPDLOG_TRACE(console);
 	return 0;
 }
 
-int32_t GangAudioDevice::RegisterAudioCallback(
-		webrtc::AudioTransport* audio_callback) {
+int32_t GangAudioDevice::RegisterAudioCallback(webrtc::AudioTransport* audio_callback) {
 	rtc::CritScope cs(&lockCb_);
 	audio_callback_ = audio_callback;
 	SPDLOG_TRACE(console);
@@ -197,8 +195,7 @@ int32_t GangAudioDevice::SetPlayoutDevice(uint16_t index) {
 	return 0;
 }
 
-int32_t GangAudioDevice::SetPlayoutDevice(
-		AudioDeviceModule::WindowsDeviceType device) {
+int32_t GangAudioDevice::SetPlayoutDevice(AudioDeviceModule::WindowsDeviceType device) {
 	SPDLOG_TRACE(console);
 	return -1;
 }
@@ -212,8 +209,7 @@ int32_t GangAudioDevice::SetRecordingDevice(uint16_t index) {
 	return -1;
 }
 
-int32_t GangAudioDevice::SetRecordingDevice(
-		AudioDeviceModule::WindowsDeviceType device) {
+int32_t GangAudioDevice::SetRecordingDevice(AudioDeviceModule::WindowsDeviceType device) {
 	SPDLOG_TRACE(console);
 	return -1;
 }
@@ -272,11 +268,12 @@ bool GangAudioDevice::Playing() const {
 int32_t GangAudioDevice::StartRecording() {
 	if (!rec_is_initialized_) {
 		return -1;
-	}SPDLOG_DEBUG(console);
+	}
+	SPDLOG_DEBUG(console);
 	rtc::CritScope cs(&lock_);
 	recording_ = true;
 	rec_buff_index_ = 0;
-	decoder_->SetAudioFrameObserver(this);
+	decoder_->SetAudioFrameObserver(this, rec_buff_);
 	return 0;
 }
 
@@ -285,7 +282,7 @@ int32_t GangAudioDevice::StopRecording() {
 	SPDLOG_DEBUG(console);
 	rtc::CritScope cs(&lock_);
 	if (decoder_) {
-		decoder_->SetAudioFrameObserver(NULL);
+		decoder_->SetAudioFrameObserver(NULL, NULL);
 	}
 	recording_ = false;
 	return 0;
@@ -308,16 +305,12 @@ bool GangAudioDevice::AGC() const {
 	return false;
 }
 
-int32_t GangAudioDevice::SetWaveOutVolume(
-		uint16_t volumeLeft,
-		uint16_t volumeRight) {
+int32_t GangAudioDevice::SetWaveOutVolume(uint16_t volumeLeft, uint16_t volumeRight) {
 	SPDLOG_TRACE(console);
 	return -1;
 }
 
-int32_t GangAudioDevice::WaveOutVolume(
-		uint16_t* volume_left,
-		uint16_t* volume_right) const {
+int32_t GangAudioDevice::WaveOutVolume(uint16_t* volume_left, uint16_t* volume_right) const {
 	SPDLOG_TRACE(console);
 	return -1;
 }
@@ -398,8 +391,7 @@ int32_t GangAudioDevice::MinMicrophoneVolume(uint32_t* /*min_volume*/) const {
 	return -1;
 }
 
-int32_t GangAudioDevice::MicrophoneVolumeStepSize(
-		uint16_t* /*step_size*/) const {
+int32_t GangAudioDevice::MicrophoneVolumeStepSize(uint16_t* /*step_size*/) const {
 	SPDLOG_TRACE(console);
 	return -1;
 }
@@ -489,22 +481,7 @@ int32_t GangAudioDevice::StereoRecording(bool* enabled) const {
 
 int32_t GangAudioDevice::SetRecordingChannel(const ChannelType channel) {
 	SPDLOG_TRACE(console);
-	rtc::CritScope cs(&lock_);
-
-	if (_recChannels == 1) {
-		return -1;
-	}
-
-	if (channel == AudioDeviceModule::kChannelBoth) {
-		// two bytes per channel
-		_recBytesPerSample = 4;
-	} else {
-		// only utilize one out of two possible channels (left or right)
-		_recBytesPerSample = 2;
-	}
-	_recChannel = channel;
-
-	return 0;
+	return -1;
 }
 
 int32_t GangAudioDevice::RecordingChannel(ChannelType* channel) const {
@@ -513,16 +490,12 @@ int32_t GangAudioDevice::RecordingChannel(ChannelType* channel) const {
 	return 0;
 }
 
-int32_t GangAudioDevice::SetPlayoutBuffer(
-		const BufferType /*type*/,
-		uint16_t /*size_ms*/) {
+int32_t GangAudioDevice::SetPlayoutBuffer(const BufferType /*type*/, uint16_t /*size_ms*/) {
 	SPDLOG_TRACE(console);
 	return 0;
 }
 
-int32_t GangAudioDevice::PlayoutBuffer(
-		BufferType* /*type*/,
-		uint16_t* /*size_ms*/) const {
+int32_t GangAudioDevice::PlayoutBuffer(BufferType* /*type*/, uint16_t* /*size_ms*/) const {
 	SPDLOG_TRACE(console);
 	return 0;
 }
@@ -564,8 +537,7 @@ int32_t GangAudioDevice::StopRawInputFileRecording() {
 	return 0;
 }
 
-int32_t GangAudioDevice::SetRecordingSampleRate(
-		const uint32_t /*samples_per_sec*/) {
+int32_t GangAudioDevice::SetRecordingSampleRate(const uint32_t /*samples_per_sec*/) {
 	SPDLOG_TRACE(console);
 	return 0;
 }
@@ -579,14 +551,12 @@ int32_t GangAudioDevice::RecordingSampleRate(uint32_t* samples_per_sec) const {
 	return 0;
 }
 
-int32_t GangAudioDevice::SetPlayoutSampleRate(
-		const uint32_t /*samples_per_sec*/) {
+int32_t GangAudioDevice::SetPlayoutSampleRate(const uint32_t /*samples_per_sec*/) {
 	SPDLOG_TRACE(console);
 	return 0;
 }
 
-int32_t GangAudioDevice::PlayoutSampleRate(
-		uint32_t* /*samples_per_sec*/) const {
+int32_t GangAudioDevice::PlayoutSampleRate(uint32_t* /*samples_per_sec*/) const {
 	SPDLOG_TRACE(console);
 	ASSERT(false);
 	return 0;
@@ -615,11 +585,24 @@ void GangAudioDevice::Initialize() {
 	_recBytesPerSample = 2 * _recChannels; // 16 bits per sample in mono, 32 bits in stereo
 	nb_samples_10ms_ = _recSampleRate / 100; // must fix to rate
 
-	SPDLOG_DEBUG(console,
+	switch (_recChannels) {
+	case 2:
+		_recChannel = AudioDeviceModule::kChannelBoth;
+		break;
+	case 1:
+		_recChannel = AudioDeviceModule::kChannelRight;
+		break;
+	default:
+		rec_is_initialized_ = false;
+		return;
+	}
+
+	SPDLOG_DEBUG(
+			console,
 			"For webrtc, rate: {}, channels: {}, bytesPerSample: {}",
-			_recSampleRate,
-			_recChannels,
-			_recBytesPerSample);
+			static_cast<int>(_recSampleRate),
+			static_cast<int>(_recChannels),
+			static_cast<int>(_recBytesPerSample));
 
 	// init rec_rest_buff_ 10ms container
 	len_bytes_per_10ms_ = nb_samples_10ms_ * _recBytesPerSample;
@@ -627,15 +610,11 @@ void GangAudioDevice::Initialize() {
 	rec_is_initialized_ = true;
 }
 
-void GangAudioDevice::OnAudioFrame(uint8_t* data, uint32_t nSamples) {
+void GangAudioDevice::OnGangFrame() {
 	if (!audio_callback_) {
-		delete[] data;
 		return;
 	}
-	rec_worker_thread_->Post(
-			this,
-			MSG_REC_DATA,
-			new SampleMsgData(new SampleData(data, nSamples)));
+	DeliverRecordedData();
 }
 
 // ----------------------------------------------------------------------------
@@ -709,8 +688,7 @@ void GangAudioDevice::OnMessage(rtc::Message* msg) {
 	switch (msg->message_id) {
 	case MSG_REC_DATA:
 		rtc::CritScope cs(&lockCb_);
-		rtc::scoped_ptr<SampleMsgData> pdata(
-				static_cast<SampleMsgData*>(msg->pdata));
+		rtc::scoped_ptr<SampleMsgData> pdata(static_cast<SampleMsgData*>(msg->pdata));
 		SampleData* data = pdata->data().get();
 		OnRecData(data->data, data->nSamples);
 		break;

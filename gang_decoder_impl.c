@@ -40,7 +40,9 @@ gang_decoder *new_gang_decoder(const char *url, const char *rec_name, int record
 		dec->bytes_per_sample = 2; // always output s16
 
 		dec->video_buff = NULL;
-		dec->video_dst_bufsize = 0;
+		dec->audio_buff = NULL;
+		dec->video_buff_size = 0;
+		dec->audio_buff_size = 0;
 
 		dec->ifmt_ctx = NULL;
 		dec->ofmt_ctx = NULL;
@@ -73,7 +75,7 @@ static void init_av_info(gang_decoder *dec) {
 			dec->pix_fmt = fsc.os->codec->pix_fmt;
 			dec->width = fsc.os->codec->width;
 			dec->height = fsc.os->codec->height;
-			dec->video_dst_bufsize = av_image_get_buffer_size(
+			dec->video_buff_size = av_image_get_buffer_size(
 					dec->pix_fmt,
 					dec->width,
 					dec->height,
@@ -91,12 +93,17 @@ static void init_av_info(gang_decoder *dec) {
 					dec->width,
 					dec->height,
 					dec->fps,
-					dec->video_dst_bufsize);
+					dec->video_buff_size);
 		} else {
 			dec->no_audio = 0;
 			dec->channels = fsc.os->codec->channels;
 			dec->sample_rate = fsc.os->codec->sample_rate;
-			LOG_DEBUG("channels:%d, sample_rate:%d", dec->channels, dec->sample_rate);
+			dec->audio_buff_size = dec->bytes_per_sample * dec->channels * dec->sample_rate / 100;
+			LOG_DEBUG(
+					"channels:%d, sample_rate:%d, buff_size:%d",
+					dec->channels,
+					dec->sample_rate,
+					dec->audio_buff_size);
 		}
 	}
 }
@@ -174,50 +181,32 @@ void close_gang_decoder(gang_decoder *dec) {
 	LOG_DEBUG("All are released.");
 }
 
-static int copy_send_audio_frame(gang_decoder* dec, uint8_t **data, int *nb_samples) {
-	size_t output_linesize = dec->o_frame->nb_samples * dec->bytes_per_sample * dec->channels;
-	if (output_linesize < 1) {
-		LOG_INFO("decode audio frame error! length < 1");
-		return -1;
-	}
-
-	*data = (uint8_t*) malloc(output_linesize);
-	if (!(*data)) {
-		LOG_DEBUG("alloc audio data error");
-		return AVERROR(ENOMEM);
-	}
-	memcpy(*data, dec->o_frame->extended_data[0], output_linesize);
-	*nb_samples = dec->o_frame->nb_samples;
-	return 0;
-}
-
-static int copy_send_video_frame(gang_decoder* dec) {
-	return av_image_copy_to_buffer(
-			dec->video_buff,
-			dec->video_dst_bufsize,
-			(const uint8_t **) (dec->o_frame->data),
-			dec->o_frame->linesize,
-			dec->pix_fmt,
-			dec->width,
-			dec->height,
-			1);
+static int copy_send_frame(gang_decoder* dec, FilterStreamContext *fsc) {
+	int ret = 0;
+	if (fsc->is_video && dec->video_buff)
+		ret = av_image_copy_to_buffer(
+				dec->video_buff,
+				dec->video_buff_size,
+				(const uint8_t **) (dec->o_frame->data),
+				dec->o_frame->linesize,
+				dec->pix_fmt,
+				dec->width,
+				dec->height,
+				1);
+	else if (!fsc->is_video && dec->audio_buff)
+		memcpy(dec->audio_buff, dec->o_frame->extended_data[0], dec->audio_buff_size);
+	return ret;
 }
 
 // From transcoding.c
 // When flushing, i_frame must be set NULL.
 // So we do not auto get i_frame from dec.
-static int filter_encode_write_frame(
-		gang_decoder* dec,
-		uint8_t **data,
-		int *nb_size,
-		FilterStreamContext *fsc,
-		AVFrame *i_frame,
-		int is_send) {
+static int filter_encode_write_frame(gang_decoder* dec, FilterStreamContext *fsc, int not_eof) {
 
 	int ret;
 
 	/* push the decoded frame into the filtergraph */
-	ret = av_buffersrc_add_frame_flags(fsc->buffersrc_ctx, i_frame, 0);
+	ret = av_buffersrc_add_frame_flags(fsc->buffersrc_ctx, not_eof ? dec->i_frame : NULL, 0);
 	if (ret < 0) {
 		av_log(NULL, AV_LOG_ERROR, "Error while feeding the filtergraph\n");
 		return ret;
@@ -241,12 +230,10 @@ static int filter_encode_write_frame(
 		dec->o_frame->pict_type = AV_PICTURE_TYPE_NONE;
 
 		// send data to rtc
-		if (is_send) {
-			is_send = 0;
-			if (fsc->is_video && dec->video_buff)
-				ret = copy_send_video_frame(dec);
-			else if (!fsc->is_video && data)
-				ret = copy_send_audio_frame(dec, data, nb_size);
+		// temp use not_eof to tag if sent data.
+		if (not_eof) {
+			not_eof = 0;
+			ret = copy_send_frame(dec, fsc);
 			if (ret < 0) {
 				LOG_DEBUG("copy and send frame to rtc error");
 				break;
@@ -271,7 +258,7 @@ static int filter_encode_write_frame(
 /**
  * return: -1->FITAL, 0->error, 1->video, 2->audio
  */
-int gang_decode_next_frame(gang_decoder* dec, uint8_t **data, int *nb_size) {
+int gang_decode_next_frame(gang_decoder* dec) {
 	FilterStreamContext fsc;
 	AVStream *is;
 	int got_frame;
@@ -306,12 +293,12 @@ int gang_decode_next_frame(gang_decoder* dec, uint8_t **data, int *nb_size) {
 
 	if (got_frame) {
 		dec->i_frame->pts = av_frame_get_best_effort_timestamp(dec->i_frame);
-		err = filter_encode_write_frame(dec, data, nb_size, &fsc, dec->i_frame, 1);
+		err = filter_encode_write_frame(dec, &fsc, 1);
 		if (err < 0)
 			return GANG_FITAL;
 		if (fsc.is_video && dec->video_buff)
 			return GANG_VIDEO_DATA;
-		if (!fsc.is_video && data)
+		if (!fsc.is_video && dec->audio_buff)
 			return GANG_AUDIO_DATA;
 	}
 
@@ -331,7 +318,7 @@ int flush_gang_rec_encoder(gang_decoder* dec) {
 		if (!dec->fscs[i].filter_graph) {
 			continue;
 		}
-		ret = filter_encode_write_frame(dec, NULL, 0, &dec->fscs[i], NULL, 0);
+		ret = filter_encode_write_frame(dec, &dec->fscs[i], 0);
 		if (ret < 0) {
 			av_log(NULL, AV_LOG_ERROR, "Flushing filter failed\n");
 			return ret;

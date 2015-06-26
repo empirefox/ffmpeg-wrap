@@ -12,23 +12,12 @@
 namespace gang {
 
 // need be shared_ptr
-class VideoFrameObserver {
+class GangFrameObserver {
 public:
-	// signal data uint8*
 	// see "talk/media/webrtc/webrtcvideoframe.h"
-	virtual void OnVideoFrame() = 0;
+	virtual void OnGangFrame() = 0;
 protected:
-	~VideoFrameObserver() {
-	}
-};
-
-// need be shared_ptr
-class AudioFrameObserver {
-public:
-	// return true if data has been freed
-	virtual void OnAudioFrame(uint8_t* data, uint32_t nSamples) = 0;
-protected:
-	~AudioFrameObserver() {
+	~GangFrameObserver() {
 	}
 };
 
@@ -46,8 +35,8 @@ public:
 	bool IsVideoAvailable();
 	bool IsAudioAvailable();
 
-	bool SetVideoFrameObserver(VideoFrameObserver* video_frame_observer_, uint8_t* data);
-	bool SetAudioFrameObserver(AudioFrameObserver* audio_frame_observer_);
+	bool SetVideoFrameObserver(GangFrameObserver* observer, uint8_t* buff);
+	bool SetAudioFrameObserver(GangFrameObserver* observer, uint8_t* buff);
 
 	void GetVideoInfo(int* width, int* height, int* fps);
 	void GetAudioInfo(uint32_t* sample_rate, uint8_t* channels);
@@ -61,8 +50,8 @@ private:
 	void stop(bool force);
 
 	gang_decoder* decoder_;
-	VideoFrameObserver* video_frame_observer_;
-	AudioFrameObserver* audio_frame_observer_;
+	GangFrameObserver* video_frame_observer_;
+	GangFrameObserver* audio_frame_observer_;
 
 	mutable rtc::CriticalSection crit_;
 	bool connected_;
