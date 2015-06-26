@@ -26,7 +26,7 @@ protected:
 class AudioFrameObserver {
 public:
 	// return true if data has been freed
-	virtual bool OnAudioFrame(uint8_t* data, uint32_t nSamples) = 0;
+	virtual void OnAudioFrame(uint8_t* data, uint32_t nSamples) = 0;
 protected:
 	~AudioFrameObserver() {
 	}

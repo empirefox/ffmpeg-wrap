@@ -119,13 +119,12 @@ bool GangDecoder::nextFrameLoop() {
 			video_frame_observer_->OnVideoFrame(
 					reinterpret_cast<void*>(data),
 					static_cast<uint32>(size));
-			break;
 		}
 		::free(data);
 		break;
 	case GANG_AUDIO_DATA:
-		if (audio_frame_observer_
-				&& audio_frame_observer_->OnAudioFrame(data, static_cast<uint32_t>(size))) {
+		if (audio_frame_observer_) {
+			audio_frame_observer_->OnAudioFrame(data, static_cast<uint32_t>(size));
 			break;
 		}
 		::free(data);
@@ -185,6 +184,7 @@ void GangDecoder::SetRecordEnabled(bool enabled) {
 	rec_enabled_ = enabled;
 	decoder_->rec_enabled = enabled;
 	if (rec_enabled_ || video_frame_observer_ || audio_frame_observer_) {
+		SPDLOG_DEBUG(console, "SetRecordEnabled true")
 		Start();
 	}
 }

@@ -199,7 +199,7 @@ public:
 
 	virtual void OnMessage(rtc::Message* msg) override;
 
-	virtual bool OnAudioFrame(uint8_t* data, uint32_t nSamples) override;
+	virtual void OnAudioFrame(uint8_t* data, uint32_t nSamples) override;
 
 	virtual int AddRef();
 	virtual int Release();

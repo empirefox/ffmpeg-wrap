@@ -627,15 +627,15 @@ void GangAudioDevice::Initialize() {
 	rec_is_initialized_ = true;
 }
 
-bool GangAudioDevice::OnAudioFrame(uint8_t* data, uint32_t nSamples) {
+void GangAudioDevice::OnAudioFrame(uint8_t* data, uint32_t nSamples) {
 	if (!audio_callback_) {
-		return false;
+		delete[] data;
+		return;
 	}
 	rec_worker_thread_->Post(
 			this,
 			MSG_REC_DATA,
 			new SampleMsgData(new SampleData(data, nSamples)));
-	return true;
 }
 
 // ----------------------------------------------------------------------------
