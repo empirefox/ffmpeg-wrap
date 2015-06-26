@@ -426,8 +426,10 @@ int encode_write_frame(gang_decoder* dec, FilterStreamContext *fsc, int *got_fra
 	av_init_packet(&dec->o_pkt);
 
 	ret = enc_func(os->codec, &dec->o_pkt, o_frame, got_frame);
-	if (ret < 0)
+	if (ret < 0) {
+		LOG_DEBUG("enc_func error");
 		return ret;
+	}
 	if (!(*got_frame))
 		return 0;
 
@@ -435,7 +437,6 @@ int encode_write_frame(gang_decoder* dec, FilterStreamContext *fsc, int *got_fra
 	dec->o_pkt.stream_index = os->index;
 	av_packet_rescale_ts(&dec->o_pkt, os->codec->time_base, os->time_base);
 
-	av_log(NULL, AV_LOG_DEBUG, "Muxing frame\n");
 	/* mux encoded frame */
 	ret = av_interleaved_write_frame(dec->ofmt_ctx, &dec->o_pkt);
 	return ret;

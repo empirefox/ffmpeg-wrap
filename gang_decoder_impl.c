@@ -10,7 +10,7 @@
 #include "ffmpeg_format.h"
 
 void initialize_gang_decoder_globel() {
-    avcodec_register_all();
+	avcodec_register_all();
 	av_register_all();
 	avformat_network_init();
 	avfilter_register_all();
@@ -39,7 +39,7 @@ gang_decoder *new_gang_decoder(const char *url, const char *rec_name, int record
 		dec->sample_rate = 0;
 		dec->bytes_per_sample = 2; // always output s16
 
-		dec->video_dst_data[0] = NULL;
+		dec->video_buff = NULL;
 		dec->video_dst_bufsize = 0;
 
 		dec->ifmt_ctx = NULL;
@@ -73,6 +73,11 @@ static void init_av_info(gang_decoder *dec) {
 			dec->pix_fmt = fsc.os->codec->pix_fmt;
 			dec->width = fsc.os->codec->width;
 			dec->height = fsc.os->codec->height;
+			dec->video_dst_bufsize = av_image_get_buffer_size(
+					dec->pix_fmt,
+					dec->width,
+					dec->height,
+					1);
 			AVRational rate = fsc.os->r_frame_rate;
 			if (rate.den) {
 				dec->fps = rate.num / rate.den;
@@ -81,11 +86,12 @@ static void init_av_info(gang_decoder *dec) {
 				dec->fps = 10000;
 			}
 			LOG_DEBUG(
-					"pix_fmt:%s, width:%d, height:%d, fps:%d",
+					"pix_fmt:%s, width:%d, height:%d, fps:%d, buff_size:%d",
 					av_get_pix_fmt_name(dec->pix_fmt),
 					dec->width,
 					dec->height,
-					dec->fps);
+					dec->fps,
+					dec->video_dst_bufsize);
 		} else {
 			dec->no_audio = 0;
 			dec->channels = fsc.os->codec->channels;
@@ -93,24 +99,6 @@ static void init_av_info(gang_decoder *dec) {
 			LOG_DEBUG("channels:%d, sample_rate:%d", dec->channels, dec->sample_rate);
 		}
 	}
-}
-
-// return error
-static int init_gang_video_decode_buffer(gang_decoder *dec) {
-	/* allocate image where the decoded image will be put */
-	int size = av_image_alloc(
-			dec->video_dst_data,
-			dec->video_dst_linesize,
-			dec->width,
-			dec->height,
-			dec->pix_fmt,
-			1);
-	if (size < 0) {
-		LOG_INFO("Could not allocate raw video buffer");
-		return -1;
-	}
-	dec->video_dst_bufsize = size;
-	return 0;
 }
 
 int init_gang_av_info(gang_decoder *dec) {
@@ -139,8 +127,6 @@ int open_gang_decoder(gang_decoder *dec) {
 	if (!err)
 		err = init_filters(dec->fscs, dec->fsc_size);
 	if (!err)
-		err = init_gang_video_decode_buffer(dec);
-	if (!err)
 		err = init_frame(&dec->i_frame);
 	if (!err)
 		err = init_frame(&dec->o_frame);
@@ -168,7 +154,6 @@ void close_gang_decoder(gang_decoder *dec) {
 		}
 		avformat_close_input(&dec->ifmt_ctx);
 	}
-	LOG_DEBUG("ifmt_ctx");
 	if (dec->ofmt_ctx) {
 		for (i = 0; i < dec->ofmt_ctx->nb_streams; i++) {
 			avcodec_close(dec->ofmt_ctx->streams[i]->codec);
@@ -177,7 +162,6 @@ void close_gang_decoder(gang_decoder *dec) {
 			avio_closep(&dec->ofmt_ctx->pb);
 		avformat_free_context(dec->ofmt_ctx);
 	}
-	LOG_DEBUG("ofmt_ctx");
 	if (dec->fscs) {
 		for (i = 0; i < dec->fsc_size; i++) {
 			if (dec->fscs[i].filter_graph) {
@@ -187,11 +171,6 @@ void close_gang_decoder(gang_decoder *dec) {
 		}
 		av_freep(&dec->fscs);
 	}
-	LOG_DEBUG("fscs");
-
-	// free av_image_alloc
-	if (dec->video_dst_data[0])
-		av_freep(&dec->video_dst_data[0]);
 	LOG_DEBUG("All are released.");
 }
 
@@ -204,6 +183,7 @@ static int copy_send_audio_frame(gang_decoder* dec, uint8_t **data, int *nb_samp
 
 	*data = (uint8_t*) malloc(output_linesize);
 	if (!(*data)) {
+		LOG_DEBUG("alloc audio data error");
 		return AVERROR(ENOMEM);
 	}
 	memcpy(*data, dec->o_frame->extended_data[0], output_linesize);
@@ -211,23 +191,16 @@ static int copy_send_audio_frame(gang_decoder* dec, uint8_t **data, int *nb_samp
 	return 0;
 }
 
-static int copy_send_video_frame(gang_decoder* dec, uint8_t **data, int *size) {
-	av_image_copy(
-			dec->video_dst_data,
-			dec->video_dst_linesize,
+static int copy_send_video_frame(gang_decoder* dec) {
+	return av_image_copy_to_buffer(
+			dec->video_buff,
+			dec->video_dst_bufsize,
 			(const uint8_t **) (dec->o_frame->data),
 			dec->o_frame->linesize,
 			dec->pix_fmt,
 			dec->width,
-			dec->height);
-
-	*data = (uint8_t*) malloc(dec->video_dst_bufsize);
-	if (!(*data)) {
-		return AVERROR(ENOMEM);
-	}
-	memcpy(*data, dec->video_dst_data[0], dec->video_dst_bufsize);
-	*size = dec->video_dst_bufsize;
-	return 0;
+			dec->height,
+			1);
 }
 
 // From transcoding.c
@@ -238,7 +211,8 @@ static int filter_encode_write_frame(
 		uint8_t **data,
 		int *nb_size,
 		FilterStreamContext *fsc,
-		AVFrame *i_frame) {
+		AVFrame *i_frame,
+		int is_send) {
 
 	int ret;
 
@@ -267,24 +241,30 @@ static int filter_encode_write_frame(
 		dec->o_frame->pict_type = AV_PICTURE_TYPE_NONE;
 
 		// send data to rtc
-		if (data) {
-			if (fsc->is_video)
-				ret = copy_send_video_frame(dec, data, nb_size);
-			else
+		if (is_send) {
+			is_send = 0;
+			if (fsc->is_video && dec->video_buff)
+				ret = copy_send_video_frame(dec);
+			else if (!fsc->is_video && data)
 				ret = copy_send_audio_frame(dec, data, nb_size);
-			data = NULL;
-			if (ret < 0)
+			if (ret < 0) {
+				LOG_DEBUG("copy and send frame to rtc error");
 				break;
+			}
 		}
 
 		// write to record file
 		if (dec->rec_enabled) {
 			ret = encode_write_frame(dec, fsc, NULL);
-			if (ret < 0)
+			if (ret < 0) {
+				LOG_DEBUG("encode_write_frame error");
 				break;
+			}
 		}
 	}
 
+	if (ret > 0)
+		ret = 0;
 	return ret;
 }
 
@@ -326,10 +306,13 @@ int gang_decode_next_frame(gang_decoder* dec, uint8_t **data, int *nb_size) {
 
 	if (got_frame) {
 		dec->i_frame->pts = av_frame_get_best_effort_timestamp(dec->i_frame);
-		err = filter_encode_write_frame(dec, data, nb_size, &fsc, dec->i_frame);
+		err = filter_encode_write_frame(dec, data, nb_size, &fsc, dec->i_frame, 1);
 		if (err < 0)
 			return GANG_FITAL;
-		return data ? (fsc.is_video ? GANG_VIDEO_DATA : GANG_AUDIO_DATA) : GANG_ERROR_DATA;
+		if (fsc.is_video && dec->video_buff)
+			return GANG_VIDEO_DATA;
+		if (!fsc.is_video && data)
+			return GANG_AUDIO_DATA;
 	}
 
 	return GANG_ERROR_DATA;
@@ -348,7 +331,7 @@ int flush_gang_rec_encoder(gang_decoder* dec) {
 		if (!dec->fscs[i].filter_graph) {
 			continue;
 		}
-		ret = filter_encode_write_frame(dec, NULL, 0, &dec->fscs[i], NULL);
+		ret = filter_encode_write_frame(dec, NULL, 0, &dec->fscs[i], NULL, 0);
 		if (ret < 0) {
 			av_log(NULL, AV_LOG_ERROR, "Flushing filter failed\n");
 			return ret;

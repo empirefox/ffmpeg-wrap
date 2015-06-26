@@ -110,17 +110,11 @@ bool GangDecoder::nextFrameLoop() {
 	int size = 0;
 
 	rtc::CritScope cs(&crit_);
-	switch (::gang_decode_next_frame(
-			decoder_,
-			(video_frame_observer_ || audio_frame_observer_) ? &data : NULL,
-			&size)) {
+	switch (::gang_decode_next_frame(decoder_, audio_frame_observer_ ? &data : NULL, &size)) {
 	case GANG_VIDEO_DATA:
 		if (video_frame_observer_) {
-			video_frame_observer_->OnVideoFrame(
-					reinterpret_cast<void*>(data),
-					static_cast<uint32>(size));
+			video_frame_observer_->OnVideoFrame();
 		}
-		::free(data);
 		break;
 	case GANG_AUDIO_DATA:
 		if (audio_frame_observer_) {
@@ -142,9 +136,10 @@ bool GangDecoder::nextFrameLoop() {
 }
 
 // Do not call in the running thread
-bool GangDecoder::SetVideoFrameObserver(VideoFrameObserver* video_frame_observer) {
+bool GangDecoder::SetVideoFrameObserver(VideoFrameObserver* observer, uint8_t* data) {
 	rtc::CritScope cs(&crit_);
-	video_frame_observer_ = video_frame_observer;
+	video_frame_observer_ = observer;
+	decoder_->video_buff = data;
 	if (video_frame_observer_) {
 		SPDLOG_DEBUG(console, "Start")
 		return connected_ || Start();
@@ -156,9 +151,9 @@ bool GangDecoder::SetVideoFrameObserver(VideoFrameObserver* video_frame_observer
 }
 
 // Do not call in the running thread
-bool GangDecoder::SetAudioFrameObserver(AudioFrameObserver* audio_frame_observer) {
+bool GangDecoder::SetAudioFrameObserver(AudioFrameObserver* observer) {
 	rtc::CritScope cs(&crit_);
-	audio_frame_observer_ = audio_frame_observer;
+	audio_frame_observer_ = observer;
 	if (audio_frame_observer_) {
 		SPDLOG_DEBUG(console, "Start")
 		return connected_ || Start();

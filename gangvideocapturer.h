@@ -28,7 +28,7 @@ public:
 
 	// Implements VideoFrameObserver
 	// data uint8*
-	virtual void OnVideoFrame(void* data, uint32 size);
+	virtual void OnVideoFrame();
 
 protected:
 	GangVideoCapturer(GangDecoder* gang_thread);

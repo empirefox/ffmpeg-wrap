@@ -16,12 +16,11 @@ GangVideoCapturer::~GangVideoCapturer() {
 	if (gang_thread_) {
 		gang_thread_ = NULL;
 	}
-	delete[] static_cast<uint8*>(captured_frame_.data);
+	delete[] static_cast<char*>(captured_frame_.data);
 }
 
 GangVideoCapturer* GangVideoCapturer::Create(GangDecoder* gang_thread) {
-	std::unique_ptr<GangVideoCapturer> capturer(
-			new GangVideoCapturer(gang_thread));
+	std::unique_ptr<GangVideoCapturer> capturer(new GangVideoCapturer(gang_thread));
 	if (!capturer.get()) {
 		return NULL;
 	}
@@ -41,6 +40,8 @@ void GangVideoCapturer::Initialize() {
 	captured_frame_.pixel_width = 1;
 	captured_frame_.width = width;
 	captured_frame_.height = height;
+	captured_frame_.data_size = static_cast<uint32>(cricket::VideoFrame::SizeOf(width, height));
+	captured_frame_.data = new char[captured_frame_.data_size];
 
 	// Enumerate the supported formats. We have only one supported format. We set
 	// the frame interval to kMinimumInterval here. In Start(), if the capture
@@ -69,10 +70,14 @@ CaptureState GangVideoCapturer::Start(const VideoFormat& capture_format) {
 
 	start_time_ns_ = static_cast<int64>(rtc::TimeNanos());
 
-	if (gang_thread_ && gang_thread_->SetVideoFrameObserver(this)) {
-		SPDLOG_DEBUG(console,"OK");
+	if (gang_thread_
+			&& gang_thread_->SetVideoFrameObserver(
+					this,
+					static_cast<uint8_t*>(captured_frame_.data))) {
+		SPDLOG_DEBUG(console, "OK");
 		return cricket::CS_RUNNING;
-	}SPDLOG_DEBUG(console,"Failed");
+	}
+	SPDLOG_DEBUG(console, "Failed");
 	return cricket::CS_FAILED;
 }
 
@@ -80,7 +85,7 @@ void GangVideoCapturer::Stop() {
 	SPDLOG_DEBUG(console);
 	SetCaptureFormat(NULL);
 	if (gang_thread_) {
-		gang_thread_->SetVideoFrameObserver(NULL);
+		gang_thread_->SetVideoFrameObserver(NULL, NULL);
 	}
 }
 
@@ -88,10 +93,7 @@ bool GangVideoCapturer::IsRunning() {
 	return gang_thread_ && gang_thread_->Connected();
 }
 
-void GangVideoCapturer::OnVideoFrame(void* data, uint32 size) {
-	captured_frame_.data_size = size;
-	captured_frame_.data = data;
-
+void GangVideoCapturer::OnVideoFrame() {
 	captured_frame_.time_stamp = static_cast<int64>(rtc::TimeNanos());
 	captured_frame_.elapsed_time = captured_frame_.time_stamp - start_time_ns_;
 

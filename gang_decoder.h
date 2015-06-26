@@ -16,7 +16,7 @@ class VideoFrameObserver {
 public:
 	// signal data uint8*
 	// see "talk/media/webrtc/webrtcvideoframe.h"
-	virtual void OnVideoFrame(void* data, uint32 size) = 0;
+	virtual void OnVideoFrame() = 0;
 protected:
 	~VideoFrameObserver() {
 	}
@@ -46,7 +46,7 @@ public:
 	bool IsVideoAvailable();
 	bool IsAudioAvailable();
 
-	bool SetVideoFrameObserver(VideoFrameObserver* video_frame_observer_);
+	bool SetVideoFrameObserver(VideoFrameObserver* video_frame_observer_, uint8_t* data);
 	bool SetAudioFrameObserver(AudioFrameObserver* audio_frame_observer_);
 
 	void GetVideoInfo(int* width, int* height, int* fps);
