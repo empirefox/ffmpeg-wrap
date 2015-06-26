@@ -26,22 +26,8 @@ namespace gang {
 
 const uint32_t kMaxBufferSizeBytes = 3840; // 10ms in stereo @ 96kHz
 
-class SampleData {
+class GangAudioDevice: public AudioDeviceModule, public GangFrameObserver {
 public:
-	uint8_t* data;
-	uint32_t nSamples;
-	SampleData(uint8_t* _data, uint32_t _nSamples);
-	~SampleData();
-};
-
-typedef rtc::ScopedMessageData<SampleData> SampleMsgData;
-
-class GangAudioDevice: public AudioDeviceModule, public GangFrameObserver, rtc::MessageHandler {
-public:
-
-	enum {
-		MSG_REC_DATA,
-	};
 
 	// Creates a GangAudioDevice or returns NULL on failure.
 	// |process_thread| is used to push and pull audio frames to and from the
@@ -177,10 +163,6 @@ public:
 
 	int32_t DeliverRecordedData();
 
-	void OnRecData(uint8_t* data, uint32_t nSamples);
-
-	virtual void OnMessage(rtc::Message* msg) override;
-
 	virtual void OnGangFrame() override;
 
 	virtual int AddRef();
@@ -223,8 +205,6 @@ private:
 	int rec_buff_index_;
 	int len_bytes_per_10ms_;
 	int nb_samples_10ms_;
-
-	rtc::Thread* rec_worker_thread_;
 
 	mutable rtc::CriticalSection lock_;
 	mutable rtc::CriticalSection lockCb_;

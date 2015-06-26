@@ -23,15 +23,6 @@ static const uint32 kAdmMaxIdleTimeProcess = 1000;
 static const int kTotalDelayMs = 0;
 static const int kClockDriftMs = 0;
 
-SampleData::SampleData(uint8_t* _data, uint32_t _nSamples) :
-				data(_data),
-				nSamples(_nSamples) {
-}
-
-SampleData::~SampleData() {
-	free(data);
-}
-
 GangAudioDevice::GangAudioDevice(GangDecoder* decoder, int stop_ref_count) :
 				ref_count_(0),
 				stop_ref_count_(stop_ref_count),
@@ -43,7 +34,6 @@ GangAudioDevice::GangAudioDevice(GangDecoder* decoder, int stop_ref_count) :
 				rec_buff_index_(0),
 				len_bytes_per_10ms_(0),
 				nb_samples_10ms_(0),
-				rec_worker_thread_(new rtc::Thread),
 				_recSampleRate(0),
 				_recChannels(0),
 				_recChannel(AudioDeviceModule::kChannelBoth),
@@ -55,7 +45,6 @@ GangAudioDevice::GangAudioDevice(GangDecoder* decoder, int stop_ref_count) :
 				_clockDrift(kClockDriftMs),
 				_record_index(0) {
 
-	rec_worker_thread_->Start();
 	memset(rec_buff_, 0, kMaxBufferSizeBytes);
 	SPDLOG_TRACE(console);
 }
@@ -69,12 +58,6 @@ GangAudioDevice::~GangAudioDevice() {
 		if (decoder_) {
 			decoder_->SetAudioFrameObserver(NULL, NULL);
 			decoder_ = NULL;
-		}
-		if (rec_worker_thread_) {
-			rec_worker_thread_->Stop();
-			rec_worker_thread_->Clear(this);
-			delete rec_worker_thread_;
-			rec_worker_thread_ = NULL;
 		}
 	}
 }
@@ -639,60 +622,6 @@ int32_t GangAudioDevice::DeliverRecordedData() {
 	}
 
 	return 0;
-}
-
-// ----------------------------------------------------------------------------
-//  OnRecData
-//
-//  Store recorded audio buffer in local memory ready for the actual
-//  "delivery" using a callback.
-//
-//  This method can also parse out left or right channel from a stereo
-//  input signal, i.e., emulate mono.
-//
-//  Examples:
-//
-//  16-bit,48kHz mono,  10ms => nSamples=480 => _recSize=2*480=960 bytes
-//  16-bit,48kHz stereo,10ms => nSamples=480 => _recSize=4*480=1920 bytes
-// ----------------------------------------------------------------------------
-void GangAudioDevice::OnRecData(uint8_t* data, uint32_t nSamples) {
-
-	uint32_t nb_src_bytes = nSamples * _recBytesPerSample;
-	uint32_t src_index = 0;
-
-	// Ensure that user has initialized all essential members
-	if ((_recSampleRate == 0) || (nb_src_bytes == 0) || (_recChannels == 0)) {
-		return;
-	}
-
-	if (AudioDeviceModule::kChannelRight == _recChannel) {
-		++src_index;
-	}
-
-	do {
-		rec_buff_[rec_buff_index_] = data[src_index];
-		++rec_buff_index_;
-		++src_index;
-		if (_recChannel != AudioDeviceModule::kChannelBoth) {
-			++src_index;
-		}
-
-		if (rec_buff_index_ == len_bytes_per_10ms_) {
-			rec_buff_index_ = 0;
-			DeliverRecordedData();
-		}
-	} while (src_index < nb_src_bytes);
-}
-
-void GangAudioDevice::OnMessage(rtc::Message* msg) {
-	switch (msg->message_id) {
-	case MSG_REC_DATA:
-		rtc::CritScope cs(&lockCb_);
-		rtc::scoped_ptr<SampleMsgData> pdata(static_cast<SampleMsgData*>(msg->pdata));
-		SampleData* data = pdata->data().get();
-		OnRecData(data->data, data->nSamples);
-		break;
-	}
 }
 
 int GangAudioDevice::AddRef() {

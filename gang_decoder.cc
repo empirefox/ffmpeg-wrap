@@ -105,10 +105,6 @@ void GangDecoder::stop(bool force) {
 
 // return true->continue, false->end
 bool GangDecoder::nextFrameLoop() {
-	uint8_t *data = NULL;
-	// or nSamples with audio data
-	int size = 0;
-
 	rtc::CritScope cs(&crit_);
 	switch (::gang_decode_next_frame(decoder_)) {
 	case GANG_VIDEO_DATA:
