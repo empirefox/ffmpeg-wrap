@@ -105,86 +105,6 @@ int open_input_file(
 }
 
 /**
- * From transcode_aac.c#init_resampler
- * return error
- * If resample_context==NULL, then no need for resample.
- *
- * Initialize the audio resampler based on the input and output codec settings.
- * If the input and output sample formats differ, a conversion is required
- * libswresample takes care of this, but requires initialization.
- */
-int init_audio_resampler(
-		AVCodecContext *input_codec_context,
-		SwrContext **resample_context,
-		int *o_chs,
-		int *o_sample_rate,
-		enum AVSampleFormat *s16_status) {
-	int error;
-
-	/**
-	 * Create a resampler context for the conversion.
-	 * Set the conversion parameters.
-	 * Default channel layouts based on the number of channels
-	 * are assumed for simplicity (they are sometimes not detected
-	 * properly by the demuxer and/or decoder).
-	 */
-	int i_chs = input_codec_context->channels;
-	enum AVSampleFormat i_sample_fmt = input_codec_context->sample_fmt;
-	int i_sample_rate = input_codec_context->sample_rate;
-	if (i_chs <= 2 && i_sample_rate <= 96000) {
-		if (i_sample_fmt == AV_SAMPLE_FMT_S16) {
-			*s16_status = AV_SAMPLE_FMT_S16;
-			LOG_DEBUG("Audio sample is s16, no need resample.");
-			return 0;
-		} else if (i_sample_fmt == AV_SAMPLE_FMT_S16P) {
-			*s16_status = AV_SAMPLE_FMT_S16P;
-			LOG_DEBUG("Audio sample is s16p, manual change to s16.");
-			return 0;
-		}
-	}
-	*s16_status = AV_SAMPLE_FMT_NONE;
-	*o_chs = i_chs > 2 ? 2 : i_chs;
-	*o_sample_rate = i_sample_rate > 96000 ? 44100 : i_sample_rate;
-
-	*resample_context = swr_alloc_set_opts(NULL,
-	// output
-			av_get_default_channel_layout(*o_chs),
-			AV_SAMPLE_FMT_S16,
-			*o_sample_rate,
-
-			// input
-			av_get_default_channel_layout(i_chs),
-			i_sample_fmt,
-			i_sample_rate,
-
-			// log
-			0,
-			NULL);
-	if (!(*resample_context)) {
-		LOG_INFO("Could not allocate resample context");
-		return AVERROR(ENOMEM);
-	}
-
-	/** Open the resampler with the specified parameters. */
-	if ((error = swr_init(*resample_context)) < 0) {
-		LOG_INFO("Could not open resample context");
-		swr_free(resample_context);
-		return error;
-	}
-
-	LOG_DEBUG(
-			"Audio resampler inited.\nfrom fmt:%s, channels:%d, rate:%d\nto   fmt:%s, channels:%d, rate:%d",
-			av_get_sample_fmt_name(i_sample_fmt),
-			i_chs,
-			i_sample_rate,
-			av_get_sample_fmt_name(AV_SAMPLE_FMT_S16),
-			*o_chs,
-			*o_sample_rate);
-
-	return 0;
-}
-
-/**
  * From transcode_aac.c
  * return error
  * Initialize one audio frame for reading from the input file
@@ -195,14 +115,4 @@ int init_frame(AVFrame **frame) {
 		return AVERROR(ENOMEM);
 	}
 	return 0;
-}
-
-void s16p_2_s16(uint8_t* dst, AVFrame *src_frame, int channels) {
-	int i, ch, bytesPerSample = 2;
-	for (i = 0; i < src_frame->nb_samples; i++) {
-		for (ch = 0; ch < channels; ++ch) {
-			memcpy(dst, src_frame->data[ch] + bytesPerSample * i, bytesPerSample);
-			dst += bytesPerSample;
-		}
-	}
 }

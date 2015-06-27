@@ -29,30 +29,24 @@ gang_decoder *new_gang_decoder(const char *url, const char *rec_name, int record
 		dec->rec_enabled = record_enabled;
 		dec->no_video = 1;
 		dec->no_audio = 1;
-
 		dec->width = 0;
 		dec->height = 0;
 		dec->fps = 0;
 		dec->pix_fmt = AV_PIX_FMT_NONE;
-
 		dec->channels = 0;
 		dec->sample_rate = 0;
 		dec->bytes_per_sample = 2; // always output s16
-
 		dec->video_buff = NULL;
 		dec->audio_buff = NULL;
 		dec->video_buff_size = 0;
 		dec->audio_buff_size = 0;
-
 		dec->ifmt_ctx = NULL;
 		dec->ofmt_ctx = NULL;
 		dec->fscs = NULL;
 		dec->fsc_size = 0;
-
 		dec->i_frame = NULL;
 		dec->o_frame = NULL;
 	}
-
 	return dec;
 }
 
@@ -62,7 +56,6 @@ void free_gang_decoder(gang_decoder *dec) {
 		free(dec->rec_name);
 		free(dec);
 	}
-	LOG_DEBUG("free_gang_decoder ok");
 }
 
 static void init_av_info(gang_decoder *dec) {
@@ -208,14 +201,14 @@ static int filter_encode_write_frame(gang_decoder* dec, FilterStreamContext *fsc
 	/* push the decoded frame into the filtergraph */
 	ret = av_buffersrc_add_frame_flags(fsc->buffersrc_ctx, not_eof ? dec->i_frame : NULL, 0);
 	if (ret < 0) {
-		av_log(NULL, AV_LOG_ERROR, "Error while feeding the filtergraph\n");
+		LOG_INFO("Error while feeding the filtergraph");
 		return ret;
 	}
 
 	/* pull filtered frames from the filtergraph */
 	while (1) {
 		av_frame_unref(dec->o_frame);
-		// av_log(NULL, AV_LOG_INFO, "Pulling filtered frame from filters\n");
+		// av_log(NULL, AV_LOG_INFO, "Pulling filtered frame from filters");
 		ret = av_buffersink_get_frame(fsc->buffersink_ctx, dec->o_frame);
 		if (ret < 0) {
 			/* if no more frames for output - returns AVERROR(EAGAIN)
@@ -235,7 +228,7 @@ static int filter_encode_write_frame(gang_decoder* dec, FilterStreamContext *fsc
 			not_eof = 0;
 			ret = copy_send_frame(dec, fsc);
 			if (ret < 0) {
-				LOG_DEBUG("copy and send frame to rtc error");
+				LOG_INFO("copy and send frame to rtc error");
 				break;
 			}
 		}
@@ -244,7 +237,7 @@ static int filter_encode_write_frame(gang_decoder* dec, FilterStreamContext *fsc
 		if (dec->rec_enabled) {
 			ret = encode_write_frame(dec, fsc, NULL);
 			if (ret < 0) {
-				LOG_DEBUG("encode_write_frame error");
+				LOG_INFO("encode_write_frame error");
 				break;
 			}
 		}
@@ -287,7 +280,7 @@ int gang_decode_next_frame(gang_decoder* dec) {
 	dec_func = fsc.is_video ? avcodec_decode_video2 : avcodec_decode_audio4;
 	err = dec_func(is->codec, dec->i_frame, &got_frame, &dec->i_pkt);
 	if (err < 0) {
-		av_log(NULL, AV_LOG_ERROR, "Decoding failed\n");
+		LOG_INFO("Decode failed");
 		return GANG_ERROR_DATA;
 	}
 
@@ -320,18 +313,20 @@ int flush_gang_rec_encoder(gang_decoder* dec) {
 		}
 		ret = filter_encode_write_frame(dec, &dec->fscs[i], 0);
 		if (ret < 0) {
-			av_log(NULL, AV_LOG_ERROR, "Flushing filter failed\n");
+			LOG_INFO("Flushing filter failed");
 			return ret;
 		}
 
 		/* flush encoder */
 		ret = flush_encoder(dec, &dec->fscs[i]);
 		if (ret < 0) {
-			av_log(NULL, AV_LOG_ERROR, "Flushing encoder failed\n");
+			LOG_INFO("Flushing encoder failed");
 			return ret;
 		}
 	}
 
 	ret = av_write_trailer(dec->ofmt_ctx);
+	if (ret)
+		LOG_ERROR("Error occurred when trail output file");
 	return ret;
 }

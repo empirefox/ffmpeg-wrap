@@ -14,8 +14,6 @@ extern "C" {
 
 #include "gang_dec.h"
 
-int normalize_opus_rate(int r);
-
 int open_input_streams(
 		const char *url,
 		AVFormatContext **ifmt_ctx,

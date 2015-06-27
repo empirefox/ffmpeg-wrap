@@ -202,7 +202,6 @@ private:
 	GangDecoder* decoder_;
 	// 10ms in stereo @ 96kHz
 	uint8_t rec_buff_[kMaxBufferSizeBytes];
-	int rec_buff_index_;
 	int len_bytes_per_10ms_;
 	int nb_samples_10ms_;
 

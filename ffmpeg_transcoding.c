@@ -2,6 +2,7 @@
  * Copyright (c) 2010 Nicolas George
  * Copyright (c) 2011 Stefano Sabatini
  * Copyright (c) 2014 Andrey Utkin
+ * Copyright (c) 2015 empirefox@gmail.com
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,12 +23,6 @@
  * THE SOFTWARE.
  */
 
-/**
- * @file
- * API example for demuxing, decoding, filtering, encoding and muxing
- * @example transcoding.c
- */
-
 #include "ffmpeg_transcoding.h"
 
 #include <libavformat/avio.h>
@@ -40,7 +35,6 @@
 #include <time.h>
 
 #include "ffmpeg_format.h"
-#include "gang_dec.h"
 
 static char *timed_name(char *name, const char *short_name) {
 	time_t rawtime;
@@ -54,7 +48,7 @@ static char *timed_name(char *name, const char *short_name) {
 	return name;
 }
 
-int normalize_opus_rate(int r) {
+static int normalize_opus_rate(int r) {
 	return r >= 44100 ?
 			48000 : (r >= 24000 ? 24000 : (r >= 16000 ? 16000 : (r >= 12000 ? 12000 : 8000)));
 }
@@ -70,7 +64,6 @@ int open_input_streams(
 	AVStream *i_a_s = NULL;
 	size_t stream_size = 0;
 	unsigned int i = 0;
-	char spec[255];
 	int ret;
 
 	if ((ret = open_input_file(url, ifmt_ctx, &i_v_s, &i_a_s)) < 0)
@@ -82,7 +75,7 @@ int open_input_streams(
 	if (stream_size) {
 		fs_ctx = av_malloc_array(stream_size, sizeof(*fs_ctx));
 		if (!fs_ctx) {
-			LOG_INFO("Could not malloc fscs array");
+			LOG_ERROR("Could not malloc fscs array");
 			return AVERROR(ENOMEM);
 		}
 	}
@@ -95,8 +88,7 @@ int open_input_streams(
 		fs_ctx[i].filter_graph = NULL;
 		fs_ctx[i].os = NULL;
 		fs_ctx[i].is = i_v_s;
-		fs_ctx[i].enc_id = AV_CODEC_ID_H264;
-		fs_ctx[i++].filter_spec = av_strdup("null");
+		fs_ctx[i++].enc_id = AV_CODEC_ID_H264;
 	}
 	if (i_a_s) {
 		fs_ctx[i].is_video = 0;
@@ -106,17 +98,9 @@ int open_input_streams(
 		fs_ctx[i].os = NULL;
 		fs_ctx[i].is = i_a_s;
 		fs_ctx[i].enc_id = AV_CODEC_ID_OPUS;
-		// Because the default d is 20ms
-		snprintf(
-				spec,
-				sizeof(spec),
-				"asetnsamples=n=%d",
-				normalize_opus_rate(i_a_s->codec->sample_rate) / 50);
-		fs_ctx[i].filter_spec = av_strdup(spec);
 	}
 	*fscs = fs_ctx;
 
-	LOG_DEBUG("end");
 	return 0;
 }
 
@@ -132,22 +116,21 @@ static int open_output_stream(FilterStreamContext *fsc, AVFormatContext *o_fmt_c
 	int i_sample_rate = i_dec_ctx->sample_rate;
 	int o_chs = 0;
 	int o_sample_rate = 0;
+	char spec[255];
 
 	int ret;
 
 	/* in this example, we choose transcoding to same codec */
 	encoder = avcodec_find_encoder(fsc->enc_id);
 	if (!encoder) {
-		av_log(NULL, AV_LOG_FATAL, "Necessary encoder not found\n");
+		LOG_INFO("Necessary encoder not found");
 		return AVERROR_INVALIDDATA;
 	}
-	LOG_DEBUG("avcodec_find_encoder ok.");
 	fsc->os = avformat_new_stream(o_fmt_ctx, encoder);
 	if (!fsc->os) {
-		av_log(NULL, AV_LOG_ERROR, "Failed allocating output stream\n");
+		LOG_INFO("Failed allocating output stream");
 		return AVERROR_UNKNOWN;
 	}
-	LOG_DEBUG("avformat_new_stream ok.");
 	enc_ctx = fsc->os->codec;
 
 	/* In this example, we transcode to same properties (picture size,
@@ -161,6 +144,9 @@ static int open_output_stream(FilterStreamContext *fsc, AVFormatContext *o_fmt_c
 		enc_ctx->pix_fmt = AV_PIX_FMT_YUV420P;
 		/* video time_base can be set to whatever is handy and supported by encoder */
 		enc_ctx->time_base = i_dec_ctx->time_base;
+
+		// TODO add spec to fit in.
+		fsc->filter_spec = av_strdup("null");
 	} else {
 		o_chs = i_chs > 2 ? 2 : i_chs;
 		o_sample_rate = normalize_opus_rate(i_sample_rate);
@@ -172,21 +158,22 @@ static int open_output_stream(FilterStreamContext *fsc, AVFormatContext *o_fmt_c
 		enc_ctx->sample_fmt = AV_SAMPLE_FMT_S16;
 		fsc->os->time_base.den = o_sample_rate;
 		fsc->os->time_base.num = 1;
+
+		// Because the default d is 20ms
+		snprintf(spec, sizeof(spec), "asetnsamples=n=%d", o_sample_rate / 50);
+		fsc->filter_spec = av_strdup(spec);
 	}
-	LOG_DEBUG("args ok.");
 
 	/* Third parameter can be used to pass settings to encoder */
 	ret = avcodec_open2(enc_ctx, encoder, NULL);
 	if (ret < 0) {
-		LOG_DEBUG("Cannot open output stream: %s->%s", i_dec_ctx->codec->name, encoder->name);
+		LOG_INFO("Cannot open output stream: %s->%s", i_dec_ctx->codec->name, encoder->name);
 		return ret;
 	}
-	LOG_DEBUG("avcodec_open2 ok.");
 
 	if (o_fmt_ctx->oformat->flags & AVFMT_GLOBALHEADER)
 		enc_ctx->flags |= CODEC_FLAG_GLOBAL_HEADER;
 
-	LOG_DEBUG("end");
 	return 0;
 }
 
@@ -205,20 +192,16 @@ int open_output_streams(
 	unsigned int i;
 	int ret;
 
-	LOG_DEBUG("begin");
 	avformat_alloc_output_context2(ofmt_ctx, NULL, NULL, timed_name(fullname, filename));
-	LOG_DEBUG("avformat_alloc_output_context2: %s.", fullname);
 	ofmt_ctx_ = *ofmt_ctx;
 	if (!ofmt_ctx_) {
-		av_log(NULL, AV_LOG_ERROR, "Could not create output context\n");
+		LOG_ERROR("Could not create output context");
 		return AVERROR_UNKNOWN;
 	}
-	LOG_DEBUG("ofmt_ctx ok.");
 	for (i = 0; i < fs_size; i++) {
-		LOG_DEBUG("  for i=%d.", i);
 		ret = open_output_stream(&fscs[i], ofmt_ctx_);
 		if (ret < 0) {
-			LOG_ERROR("  open_output_stream failed.");
+			LOG_ERROR("open_output_stream failed");
 			return ret;
 		}
 	}
@@ -226,14 +209,14 @@ int open_output_streams(
 	av_dump_format(ofmt_ctx_, 0, fullname, 1);
 
 	if (!record_enabled) {
-		LOG_DEBUG("end");
+		LOG_DEBUG("no record");
 		return 0;
 	}
 
 	if (!(ofmt_ctx_->oformat->flags & AVFMT_NOFILE)) {
 		ret = avio_open(&ofmt_ctx_->pb, fullname, AVIO_FLAG_WRITE);
 		if (ret < 0) {
-			av_log(NULL, AV_LOG_ERROR, "Could not open output file '%s'", fullname);
+			LOG_INFO("Could not open output file '%s'", fullname);
 			return ret;
 		}
 	}
@@ -241,11 +224,10 @@ int open_output_streams(
 	/* init muxer, write output file header */
 	ret = avformat_write_header(ofmt_ctx_, NULL);
 	if (ret < 0) {
-		av_log(NULL, AV_LOG_ERROR, "Error occurred when opening output file\n");
+		LOG_ERROR("Error occurred when opening output file");
 		return ret;
 	}
 
-	LOG_DEBUG("end");
 	return 0;
 }
 
@@ -253,7 +235,7 @@ int open_output_streams(
 		buffersink_ctx, #arg"s", (uint8_t*) &enc_ctx->arg,        \
 		sizeof(enc_ctx->arg), AV_OPT_SEARCH_CHILDREN);            \
 	if (ret < 0) {                                                 \
-		av_log(NULL, AV_LOG_ERROR, "Cannot set output "#arg"\n");  \
+		LOG_INFO("Cannot set output "#arg"");                    \
 		goto end;                                                  \
 	}
 
@@ -282,6 +264,7 @@ static int init_filter(FilterStreamContext *fsc) {
 	filter_graph = avfilter_graph_alloc();
 
 	if (!outputs || !inputs || !filter_graph) {
+		LOG_ERROR("Cannot alloc outputs/inputs/graph");
 		ret = AVERROR(ENOMEM);
 		goto end;
 	}
@@ -290,7 +273,7 @@ static int init_filter(FilterStreamContext *fsc) {
 		buffersrc = avfilter_get_by_name("buffer");
 		buffersink = avfilter_get_by_name("buffersink");
 		if (!buffersrc || !buffersink) {
-			av_log(NULL, AV_LOG_ERROR, "filtering source or sink element not found\n");
+			LOG_INFO("filtering source or sink element not found");
 			ret = AVERROR_UNKNOWN;
 			goto end;
 		}
@@ -310,14 +293,14 @@ static int init_filter(FilterStreamContext *fsc) {
 		ret = avfilter_graph_create_filter(&buffersrc_ctx, buffersrc, "in", args,
 		NULL, filter_graph);
 		if (ret < 0) {
-			av_log(NULL, AV_LOG_ERROR, "Cannot create buffer source\n");
+			LOG_INFO("Cannot create buffer source");
 			goto end;
 		}
 
 		ret = avfilter_graph_create_filter(&buffersink_ctx, buffersink, "out",
 		NULL, NULL, filter_graph);
 		if (ret < 0) {
-			av_log(NULL, AV_LOG_ERROR, "Cannot create buffer sink\n");
+			LOG_INFO("Cannot create buffer sink");
 			goto end;
 		}
 		SET_SINK_OPT(pix_fmt)
@@ -325,7 +308,7 @@ static int init_filter(FilterStreamContext *fsc) {
 		buffersrc = avfilter_get_by_name("abuffer");
 		buffersink = avfilter_get_by_name("abuffersink");
 		if (!buffersrc || !buffersink) {
-			av_log(NULL, AV_LOG_ERROR, "filtering source or sink element not found\n");
+			LOG_INFO("filtering source or sink element not found");
 			ret = AVERROR_UNKNOWN;
 			goto end;
 		}
@@ -344,14 +327,14 @@ static int init_filter(FilterStreamContext *fsc) {
 		ret = avfilter_graph_create_filter(&buffersrc_ctx, buffersrc, "in", args,
 		NULL, filter_graph);
 		if (ret < 0) {
-			av_log(NULL, AV_LOG_ERROR, "Cannot create audio buffer source\n");
+			LOG_INFO("Cannot create audio buffer source");
 			goto end;
 		}
 
 		ret = avfilter_graph_create_filter(&buffersink_ctx, buffersink, "out",
 		NULL, NULL, filter_graph);
 		if (ret < 0) {
-			av_log(NULL, AV_LOG_ERROR, "Cannot create audio buffer sink\n");
+			LOG_INFO("Cannot create audio buffer sink");
 			goto end;
 		}
 
@@ -427,7 +410,7 @@ int encode_write_frame(gang_decoder* dec, FilterStreamContext *fsc, int *got_fra
 
 	ret = enc_func(os->codec, &dec->o_pkt, o_frame, got_frame);
 	if (ret < 0) {
-		LOG_DEBUG("enc_func error");
+		LOG_INFO("enc_func error");
 		return ret;
 	}
 	if (!(*got_frame))
@@ -450,7 +433,7 @@ int flush_encoder(gang_decoder* dec, FilterStreamContext *fsc) {
 		return 0;
 
 	while (1) {
-		//av_log(NULL, AV_LOG_INFO, "Flushing stream #%u encoder\n", fsc->os->index);
+		//LOG_DEBUG("Flushing stream #%u encoder", fsc->os->index);
 		ret = encode_write_frame(dec, fsc, &got_frame);
 		if (ret < 0)
 			break;

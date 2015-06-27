@@ -31,7 +31,6 @@ GangAudioDevice::GangAudioDevice(GangDecoder* decoder, int stop_ref_count) :
 				recording_(false),
 				rec_is_initialized_(false),
 				decoder_(decoder),
-				rec_buff_index_(0),
 				len_bytes_per_10ms_(0),
 				nb_samples_10ms_(0),
 				_recSampleRate(0),
@@ -51,7 +50,6 @@ GangAudioDevice::GangAudioDevice(GangDecoder* decoder, int stop_ref_count) :
 
 GangAudioDevice::~GangAudioDevice() {
 	SPDLOG_TRACE(console);
-	// Ensure that thread stops calling ProcessFrame().
 	{
 		rtc::CritScope cs(&lock_);
 
@@ -255,7 +253,6 @@ int32_t GangAudioDevice::StartRecording() {
 	SPDLOG_DEBUG(console);
 	rtc::CritScope cs(&lock_);
 	recording_ = true;
-	rec_buff_index_ = 0;
 	decoder_->SetAudioFrameObserver(this, rec_buff_);
 	return 0;
 }

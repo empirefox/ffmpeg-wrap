@@ -3,7 +3,7 @@
 #include <memory>
 
 #include "gang_spdlog_console.h"
-#ifndef LOG_ERR
+#ifdef LOG_ERR
 #undef LOG_ERR
 #endif
 #include "gang_decoder_impl.h"

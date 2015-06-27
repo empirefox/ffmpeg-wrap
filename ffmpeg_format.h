@@ -6,7 +6,6 @@ extern "C" {
 #endif
 
 #include <libavformat/avformat.h>
-#include <libswresample/swresample.h>
 
 /**
  * From transcode_aac.c
@@ -35,26 +34,8 @@ int open_input_file(
 		AVStream **video_stream,
 		AVStream **audio_stream);
 
-/**
- * From transcode_aac.c#init_resampler
- * return error
- * If resample_context==NULL, then no need for resample.
- *
- * Initialize the audio resampler based on the input and output codec settings.
- * If the input and output sample formats differ, a conversion is required
- * libswresample takes care of this, but requires initialization.
- */
-int init_audio_resampler(
-		AVCodecContext *input_codec_context,
-		SwrContext **resample_context,
-		int *o_chs,
-		int *o_sample_rate,
-		enum AVSampleFormat *s16_status);
-
 /** Initialize one audio frame for reading from the input file */
 int init_frame(AVFrame **frame);
-
-void s16p_2_s16(uint8_t* dst, AVFrame *src_frame, int channels);
 
 #ifdef __cplusplus
 } // closing brace for extern "C"
