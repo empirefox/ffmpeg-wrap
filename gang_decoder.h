@@ -26,7 +26,7 @@ typedef rtc::TypedMessageData<bool> RecOnMsgData;
 class GangDecoder {
 public:
 	enum {
-		NEXT, REC_ON
+		NEXT, REC_ON, SHUTDOWN
 	};
 
 	explicit GangDecoder(const std::string& url, const std::string& rec_name, bool rec_enabled);

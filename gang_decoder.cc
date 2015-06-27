@@ -51,6 +51,9 @@ public:
 			case REC_ON:
 				dec_->SetRecOn(static_cast<RecOnMsgData*>(pmsg->pdata)->data());
 				break;
+			case SHUTDOWN:
+				dec_->Stop(true);
+				break;
 			default:
 				break;
 			}
@@ -83,8 +86,9 @@ GangDecoder::GangDecoder(const std::string& url, const std::string& rec_name, bo
 }
 
 GangDecoder::~GangDecoder() {
-	SPDLOG_TRACE(console)
+	SPDLOG_TRACE(console, "{}", __FUNCTION__)
 	if (gang_thread_) {
+		gang_thread_->Post(gang_thread_, SHUTDOWN);
 		gang_thread_->Stop();
 		gang_thread_ = NULL;
 	}
@@ -139,9 +143,8 @@ bool GangDecoder::Start() {
 	return true;
 }
 
-// Just end next loop
 void GangDecoder::Stop(bool force) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}: {}", __FUNCTION__, force)
 	if (!force && decoder_->rec_enabled) {
 		return;
 	}
@@ -170,6 +173,7 @@ bool GangDecoder::NextFrameLoop() {
 		SPDLOG_TRACE(console, "{}: {}", __FUNCTION__, "GANG_FITAL")
 		return false;
 	case GANG_ERROR_DATA: // ignore and next
+		SPDLOG_TRACE(console, "{}: {}", __FUNCTION__, "GANG_ERROR_DATA")
 		break;
 	default: // unexpected, so end loop
 		console->error() << "Unknow ret code from decoder!";
@@ -193,7 +197,7 @@ bool GangDecoder::SetAudioFrameObserver(GangFrameObserver* observer, uint8_t* bu
 bool GangDecoder::SetVideoObserver(GangFrameObserver* observer, uint8_t* buff) {
 	video_frame_observer_ = observer;
 	decoder_->video_buff = buff;
-	if (video_frame_observer_) {
+	if (observer) {
 		return Start();
 	}
 	if (!audio_frame_observer_ && connected_) {
@@ -205,7 +209,7 @@ bool GangDecoder::SetVideoObserver(GangFrameObserver* observer, uint8_t* buff) {
 bool GangDecoder::SetAudioObserver(GangFrameObserver* observer, uint8_t* buff) {
 	audio_frame_observer_ = observer;
 	decoder_->audio_buff = buff;
-	if (audio_frame_observer_) {
+	if (observer) {
 		return Start();
 	}
 	if (!video_frame_observer_ && connected_) {

@@ -191,6 +191,13 @@ static int copy_send_frame(gang_decoder* dec, FilterStreamContext *fsc) {
 				1);
 	else if (!fsc->is_video && dec->audio_buff)
 		memcpy(dec->audio_buff, dec->o_frame->extended_data[0], dec->audio_buff_size);
+	else {
+		LOG_ERROR(
+				"is_video:%d, no video_buff:%d, no audio_buff:%d",
+				fsc->is_video,
+				!dec->video_buff,
+				!dec->audio_buff);
+	}
 	return ret;
 }
 
@@ -296,6 +303,7 @@ int gang_decode_next_frame(gang_decoder* dec) {
 			return GANG_VIDEO_DATA;
 		if (!fsc.is_video && dec->audio_buff)
 			return GANG_AUDIO_DATA;
+		LOG_INFO("Unexpected type");
 	}
 
 	return GANG_ERROR_DATA;

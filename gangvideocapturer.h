@@ -31,14 +31,14 @@ public:
 	virtual void OnGangFrame();
 
 protected:
-	GangVideoCapturer(GangDecoder* gang_thread);
+	GangVideoCapturer(GangDecoder* gang);
 	void Initialize();
 	// Override virtual methods of parent class VideoCapturer.
 	virtual bool GetPreferredFourccs(std::vector<uint32>* fourccs);
 
 private:
 	CapturedFrame captured_frame_;
-	GangDecoder* gang_thread_;
+	GangDecoder* gang_;
 	int64 start_time_ns_;  // Time when the capturer starts.
 
 	DISALLOW_COPY_AND_ASSIGN(GangVideoCapturer);

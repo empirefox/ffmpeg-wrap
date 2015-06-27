@@ -2,8 +2,6 @@
 #define GANG_AUDIO_DEVICE_H
 
 #include "webrtc/base/basictypes.h"
-#include "webrtc/base/messagehandler.h"
-#include "webrtc/base/scoped_ref_ptr.h"
 #include "webrtc/common_types.h"
 #include "webrtc/modules/audio_device/include/audio_device.h"
 #include "webrtc/base/criticalsection.h"
@@ -32,7 +30,7 @@ public:
 	// Creates a GangAudioDevice or returns NULL on failure.
 	// |process_thread| is used to push and pull audio frames to and from the
 	// returned instance. Note: ownership of |process_thread| is not handed over.
-	static rtc::scoped_refptr<GangAudioDevice> Create(GangDecoder* decoder, int stop_ref_count = 0);
+	static rtc::scoped_refptr<GangAudioDevice> Create(GangDecoder* decoder);
 
 	// Following functions are inherited from webrtc::AudioDeviceModule.
 	// Only functions called by PeerConnection are implemented, the rest do
@@ -165,8 +163,9 @@ public:
 
 	virtual void OnGangFrame() override;
 
-	virtual int AddRef();
-	virtual int Release();
+	// The destructor is protected because it is reference counted and should not
+	// be deleted directly.
+	virtual ~GangAudioDevice();
 
 protected:
 	// The constructor is protected because the class needs to be created as a
@@ -174,14 +173,7 @@ protected:
 	// exposed in which case the burden of proper instantiation would be put on
 	// the creator of a GangAudioDevice instance. To create an instance of
 	// this class use the Create(..) API.
-	explicit GangAudioDevice(GangDecoder* decoder, int stop_ref_count);
-	// The destructor is protected because it is reference counted and should not
-	// be deleted directly.
-	virtual ~GangAudioDevice();
-
-	volatile int ref_count_;
-
-	int stop_ref_count_;
+	explicit GangAudioDevice(GangDecoder* decoder);
 
 private:
 

@@ -4,17 +4,17 @@
 
 namespace gang {
 
-GangVideoCapturer::GangVideoCapturer(GangDecoder* gang_thread) :
-				gang_thread_(gang_thread),
+GangVideoCapturer::GangVideoCapturer(GangDecoder* gang) :
+				gang_(gang),
 				start_time_ns_(0) {
-	SPDLOG_TRACE(console);
+	SPDLOG_TRACE(console, "{}", __FUNCTION__)
 }
 
 GangVideoCapturer::~GangVideoCapturer() {
-	SPDLOG_TRACE(console);
+	SPDLOG_TRACE(console, "{}", __FUNCTION__)
 	Stop();
-	if (gang_thread_) {
-		gang_thread_ = NULL;
+	if (gang_) {
+		gang_ = NULL;
 	}
 	delete[] static_cast<char*>(captured_frame_.data);
 }
@@ -22,6 +22,7 @@ GangVideoCapturer::~GangVideoCapturer() {
 GangVideoCapturer* GangVideoCapturer::Create(GangDecoder* gang_thread) {
 	std::unique_ptr<GangVideoCapturer> capturer(new GangVideoCapturer(gang_thread));
 	if (!capturer.get()) {
+		SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "error")
 		return NULL;
 	}
 	capturer->Initialize();
@@ -29,11 +30,11 @@ GangVideoCapturer* GangVideoCapturer::Create(GangDecoder* gang_thread) {
 }
 
 void GangVideoCapturer::Initialize() {
-	SPDLOG_DEBUG(console);
+	SPDLOG_TRACE(console, "{}", __FUNCTION__)
 	int width;
 	int height;
 	int fps;
-	gang_thread_->GetVideoInfo(&width, &height, &fps);
+	gang_->GetVideoInfo(&width, &height, &fps);
 
 	captured_frame_.fourcc = cricket::FOURCC_I420;
 	captured_frame_.pixel_height = 1;
@@ -63,17 +64,14 @@ void GangVideoCapturer::Initialize() {
 }
 
 CaptureState GangVideoCapturer::Start(const VideoFormat& capture_format) {
+	SPDLOG_TRACE(console, "{}", __FUNCTION__)
 	if (IsRunning()) {
 		return cricket::CS_FAILED;
 	}
 	SetCaptureFormat(&capture_format);
-
 	start_time_ns_ = static_cast<int64>(rtc::TimeNanos());
 
-	if (gang_thread_
-			&& gang_thread_->SetVideoFrameObserver(
-					this,
-					static_cast<uint8_t*>(captured_frame_.data))) {
+	if (gang_ && gang_->SetVideoFrameObserver(this, static_cast<uint8_t*>(captured_frame_.data))) {
 		SPDLOG_TRACE(console, "{}: {}", __FUNCTION__, "ok")
 		return cricket::CS_RUNNING;
 	}
@@ -82,15 +80,15 @@ CaptureState GangVideoCapturer::Start(const VideoFormat& capture_format) {
 }
 
 void GangVideoCapturer::Stop() {
-	SPDLOG_DEBUG(console);
+	SPDLOG_TRACE(console, "{}", __FUNCTION__)
 	SetCaptureFormat(NULL);
-	if (gang_thread_) {
-		gang_thread_->SetVideoFrameObserver(NULL, NULL);
+	if (gang_) {
+		gang_->SetVideoFrameObserver(NULL, NULL);
 	}
 }
 
 bool GangVideoCapturer::IsRunning() {
-	return gang_thread_ && gang_thread_->IsRunning();
+	return gang_ && gang_->IsRunning();
 }
 
 void GangVideoCapturer::OnGangFrame() {
