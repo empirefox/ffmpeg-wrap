@@ -74,10 +74,10 @@ CaptureState GangVideoCapturer::Start(const VideoFormat& capture_format) {
 			&& gang_thread_->SetVideoFrameObserver(
 					this,
 					static_cast<uint8_t*>(captured_frame_.data))) {
-		SPDLOG_DEBUG(console, "OK");
+		SPDLOG_TRACE(console, "{}: {}", __FUNCTION__, "ok")
 		return cricket::CS_RUNNING;
 	}
-	SPDLOG_DEBUG(console, "Failed");
+	SPDLOG_TRACE(console, "{}: {}", __FUNCTION__, "failed")
 	return cricket::CS_FAILED;
 }
 
@@ -90,7 +90,7 @@ void GangVideoCapturer::Stop() {
 }
 
 bool GangVideoCapturer::IsRunning() {
-	return gang_thread_ && gang_thread_->Connected();
+	return gang_thread_ && gang_thread_->IsRunning();
 }
 
 void GangVideoCapturer::OnGangFrame() {

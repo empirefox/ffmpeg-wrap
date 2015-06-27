@@ -21,16 +21,23 @@ protected:
 	}
 };
 
-class GangDecoder: public rtc::Thread {
+typedef rtc::TypedMessageData<bool> RecOnMsgData;
+
+class GangDecoder {
 public:
+	enum {
+		NEXT, REC_ON
+	};
+
 	explicit GangDecoder(const std::string& url, const std::string& rec_name, bool rec_enabled);
 	~GangDecoder();
 
 	bool Init();
+	bool IsRunning();
 
-	virtual void Run() override;
-	virtual void Stop() override;
-	bool Connected();
+	// only in worker thread
+	bool Start();
+	void Stop(bool force);
 
 	bool IsVideoAvailable();
 	bool IsAudioAvailable();
@@ -43,19 +50,22 @@ public:
 
 	void SetRecordEnabled(bool enabled);
 
+protected:
+	bool NextFrameLoop();
+	void SetRecOn(bool enabled);
+	// only in worker thread
+	bool SetVideoObserver(GangFrameObserver* observer, uint8_t* buff);
+	bool SetAudioObserver(GangFrameObserver* observer, uint8_t* buff);
+
+	bool connected_;
+
 private:
-	bool nextFrameLoop();
-	bool connect();
-	void disconnect();
-	void stop(bool force);
+	class GangThread; // Forward declaration, defined in .cc.
 
 	gang_decoder* decoder_;
+	GangThread* gang_thread_;
 	GangFrameObserver* video_frame_observer_;
 	GangFrameObserver* audio_frame_observer_;
-
-	mutable rtc::CriticalSection crit_;
-	bool connected_;
-	bool rec_enabled_;
 
 	DISALLOW_COPY_AND_ASSIGN(GangDecoder);
 };

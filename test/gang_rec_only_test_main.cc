@@ -33,7 +33,7 @@ static int run(char *i_filename, char *o_filename) {
 	cout << "Press Enter to Stop" << endl;
 	cin.get();
 
-	dec->Stop();
+	dec->Stop(true);
 
 	cout << "Press Enter to Quit" << endl;
 	cin.get();

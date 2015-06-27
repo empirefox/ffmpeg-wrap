@@ -131,7 +131,10 @@ int open_gang_decoder(gang_decoder *dec) {
 	if (!err)
 		err = init_frame(&dec->o_frame);
 
-	LOG_DEBUG("All are prepared with: audio:%d video:%d", !dec->no_video, !dec->no_audio);
+	if (err)
+		close_gang_decoder(dec);
+	else
+		LOG_DEBUG("All are prepared with: audio:%d video:%d", !dec->no_video, !dec->no_audio);
 	return err;
 }
 

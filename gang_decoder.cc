@@ -1,6 +1,7 @@
 #include "gang_decoder.h"
 
 #include <memory>
+#include "webrtc/base/bind.h"
 
 #include "gang_spdlog_console.h"
 #ifdef LOG_ERR
@@ -10,36 +11,92 @@
 
 namespace gang {
 
+// Take from "talk/media/devices/yuvframescapturer.h"
+class GangDecoder::GangThread: public rtc::Thread, public rtc::MessageHandler {
+public:
+	explicit GangThread(GangDecoder* dec) :
+					dec_(dec),
+					waiting_time_ms_(0),
+					finished_(false) {
+	}
+
+	virtual ~GangThread() {
+		Stop();
+	}
+
+	// Override virtual method of parent Thread. Context: Worker Thread.
+	virtual void Run() {
+		// Read the first frame and start the message pump. The pump runs until
+		// Stop() is called externally or Quit() is called by OnMessage().
+		if (dec_) {
+			Thread::Run();
+		}
+
+		rtc::CritScope cs(&crit_);
+		finished_ = true;
+	}
+
+	// Override virtual method of parent MessageHandler. Context: Worker Thread.
+	virtual void OnMessage(rtc::Message* pmsg) {
+		if (dec_) {
+			switch (pmsg->message_id) {
+			case NEXT:
+				if (dec_->NextFrameLoop()) {
+					PostDelayed(waiting_time_ms_, this, NEXT);
+					dec_->connected_ = true;
+				} else {
+					dec_->connected_ = false;
+				}
+				break;
+			case REC_ON:
+				dec_->SetRecOn(static_cast<RecOnMsgData*>(pmsg->pdata)->data());
+				break;
+			default:
+				break;
+			}
+		} else {
+			Quit();
+		}
+	}
+
+	// Check if Run() is finished.
+	bool Finished() const {
+		rtc::CritScope cs(&crit_);
+		return finished_;
+	}
+
+private:
+	GangDecoder* dec_;
+	mutable rtc::CriticalSection crit_;
+	int waiting_time_ms_;bool finished_;
+
+	DISALLOW_COPY_AND_ASSIGN(GangThread);
+};
+
 GangDecoder::GangDecoder(const std::string& url, const std::string& rec_name, bool rec_enabled) :
-				decoder_(::new_gang_decoder(url.c_str(), rec_name.c_str(), rec_enabled)),
-				video_frame_observer_(NULL),
-				audio_frame_observer_(NULL),
 				connected_(false),
-				rec_enabled_(rec_enabled) {
-	SPDLOG_TRACE(console, "url: {}, rec_name: {}", url, rec_name)
+				decoder_(::new_gang_decoder(url.c_str(), rec_name.c_str(), rec_enabled)),
+				gang_thread_(NULL),
+				video_frame_observer_(NULL),
+				audio_frame_observer_(NULL) {
+	SPDLOG_TRACE(console, "{}: url: {}, rec_name: {}", __FUNCTION__, url, rec_name)
 }
 
 GangDecoder::~GangDecoder() {
 	SPDLOG_TRACE(console)
-	Stop();
-	::free_gang_decoder(decoder_);
-}
-
-// Wait for loop end
-void GangDecoder::Stop() {
-	SPDLOG_TRACE(console)
-	{
-		rtc::CritScope cs(&crit_);
-		stop(true);
+	if (gang_thread_) {
+		gang_thread_->Stop();
+		gang_thread_ = NULL;
 	}
-	rtc::Thread::Stop();
+	::free_gang_decoder(decoder_);
 }
 
 bool GangDecoder::Init() {
 	if (!decoder_) {
 		return false;
 	}
-	return !::init_gang_av_info(decoder_);
+	gang_thread_ = new GangThread(this);
+	return gang_thread_->Start() && !::init_gang_av_info(decoder_);
 }
 
 bool GangDecoder::IsVideoAvailable() {
@@ -61,51 +118,43 @@ void GangDecoder::GetAudioInfo(uint32_t* sample_rate, uint8_t* channels) {
 	*channels = static_cast<uint8_t>(decoder_->channels);
 }
 
-void GangDecoder::Run() {
-	if (connect()) {
-		SPDLOG_TRACE(console, "connected")
-		while (connected_ && nextFrameLoop()) {
-		}
-	}
-	SPDLOG_TRACE(console, "before disconnect")
-	disconnect();
-}
-
 // Check if Run() is finished.
-bool GangDecoder::Connected() {
-	rtc::CritScope cs(&crit_);
-	return connected_;
+bool GangDecoder::IsRunning() {
+	return connected_ && gang_thread_ && !gang_thread_->Finished();
 }
 
-bool GangDecoder::connect() {
-	SPDLOG_TRACE(console)
-	rtc::CritScope cs(&crit_);
+bool GangDecoder::Start() {
+	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	if (gang_thread_->Finished()) {
+		return false;
+	}
 	if (!connected_) {
 		connected_ = !::open_gang_decoder(decoder_);
 	}
-	return connected_;
-}
-
-void GangDecoder::disconnect() {
-	SPDLOG_TRACE(console)
-	Stop();
-	rtc::CritScope cs(&crit_);
-	::flush_gang_rec_encoder(decoder_);
-	::close_gang_decoder(decoder_);
+	if (!connected_) {
+		return false;
+	}
+	gang_thread_->Clear(gang_thread_, NEXT);
+	gang_thread_->PostDelayed(0, gang_thread_, NEXT);
+	return true;
 }
 
 // Just end next loop
-void GangDecoder::stop(bool force) {
-	SPDLOG_DEBUG(console, "Stop")
-	if (!force && rec_enabled_) {
+void GangDecoder::Stop(bool force) {
+	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	if (!force && decoder_->rec_enabled) {
 		return;
 	}
-	connected_ = false;
+	if (connected_) {
+		connected_ = false;
+		::flush_gang_rec_encoder(decoder_);
+		::close_gang_decoder(decoder_);
+	}
+	gang_thread_->Clear(gang_thread_, NEXT);
 }
 
 // return true->continue, false->end
-bool GangDecoder::nextFrameLoop() {
-	rtc::CritScope cs(&crit_);
+bool GangDecoder::NextFrameLoop() {
 	switch (::gang_decode_next_frame(decoder_)) {
 	case GANG_VIDEO_DATA:
 		if (video_frame_observer_) {
@@ -118,7 +167,7 @@ bool GangDecoder::nextFrameLoop() {
 		}
 		break;
 	case GANG_FITAL: // end loop
-		SPDLOG_DEBUG(console, "GANG_EOF")
+		SPDLOG_TRACE(console, "{}: {}", __FUNCTION__, "GANG_FITAL")
 		return false;
 	case GANG_ERROR_DATA: // ignore and next
 		break;
@@ -131,30 +180,36 @@ bool GangDecoder::nextFrameLoop() {
 
 // Do not call in the running thread
 bool GangDecoder::SetVideoFrameObserver(GangFrameObserver* observer, uint8_t* buff) {
-	rtc::CritScope cs(&crit_);
-	video_frame_observer_ = observer;
-	decoder_->video_buff = buff;
-	if (video_frame_observer_) {
-		SPDLOG_DEBUG(console, "Start")
-		return connected_ || Start();
-	}
-	if (!audio_frame_observer_ && connected_) {
-		stop(false);
-	}
-	return false;
+	return gang_thread_->Invoke<bool>(
+			rtc::Bind(&GangDecoder::SetVideoObserver, this, observer, buff));
 }
 
 // Do not call in the running thread
 bool GangDecoder::SetAudioFrameObserver(GangFrameObserver* observer, uint8_t* buff) {
-	rtc::CritScope cs(&crit_);
+	return gang_thread_->Invoke<bool>(
+			rtc::Bind(&GangDecoder::SetAudioObserver, this, observer, buff));
+}
+
+bool GangDecoder::SetVideoObserver(GangFrameObserver* observer, uint8_t* buff) {
+	video_frame_observer_ = observer;
+	decoder_->video_buff = buff;
+	if (video_frame_observer_) {
+		return Start();
+	}
+	if (!audio_frame_observer_ && connected_) {
+		Stop(false);
+	}
+	return false;
+}
+
+bool GangDecoder::SetAudioObserver(GangFrameObserver* observer, uint8_t* buff) {
 	audio_frame_observer_ = observer;
 	decoder_->audio_buff = buff;
 	if (audio_frame_observer_) {
-		SPDLOG_DEBUG(console, "Start")
-		return connected_ || Start();
+		return Start();
 	}
 	if (!video_frame_observer_ && connected_) {
-		stop(false);
+		Stop(false);
 	}
 	return false;
 }
@@ -162,19 +217,17 @@ bool GangDecoder::SetAudioFrameObserver(GangFrameObserver* observer, uint8_t* bu
 // TODO fix not to stop thread when toggle rec_enabled status.
 // Do not call in the running thread
 void GangDecoder::SetRecordEnabled(bool enabled) {
-	{
-		rtc::CritScope cs(&crit_);
-		if (rec_enabled_ == enabled) {
-			return;
-		}
-		stop(true);
+	gang_thread_->Post(gang_thread_, REC_ON, new RecOnMsgData(enabled));
+}
+
+void GangDecoder::SetRecOn(bool enabled) {
+	if ((!decoder_->rec_enabled) == (!enabled)) {
+		return;
 	}
-	rtc::Thread::Stop();
-	rtc::CritScope cs(&crit_);
-	rec_enabled_ = enabled;
+	Stop(true);
 	decoder_->rec_enabled = enabled;
-	if (rec_enabled_ || video_frame_observer_ || audio_frame_observer_) {
-		SPDLOG_DEBUG(console, "SetRecordEnabled true")
+	if (enabled || video_frame_observer_ || audio_frame_observer_) {
+		SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "restart")
 		Start();
 	}
 }
