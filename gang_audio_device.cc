@@ -22,7 +22,7 @@ static const uint32 kAdmMaxIdleTimeProcess = 1000;
 static const int kTotalDelayMs = 0;
 static const int kClockDriftMs = 0;
 
-GangAudioDevice::GangAudioDevice(GangDecoder* decoder) :
+GangAudioDevice::GangAudioDevice(shared_ptr<GangDecoder> decoder) :
 				last_process_time_ms_(0),
 				audio_callback_(NULL),
 				recording_(false),
@@ -47,17 +47,16 @@ GangAudioDevice::GangAudioDevice(GangDecoder* decoder) :
 
 GangAudioDevice::~GangAudioDevice() {
 	SPDLOG_TRACE(console, "{}", __FUNCTION__)
-	{
-		rtc::CritScope cs(&lock_);
-
-		if (decoder_) {
-			decoder_->SetAudioFrameObserver(NULL, NULL);
-			decoder_ = NULL;
-		}
+	rtc::CritScope cs(&lock_);
+	if (recording_) {
+		recording_ = false;
+		decoder_->SetAudioFrameObserver(NULL, NULL);
+		decoder_ = NULL;
 	}
+	SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "error")
 }
 
-rtc::scoped_refptr<GangAudioDevice> GangAudioDevice::Create(GangDecoder* decoder) {
+rtc::scoped_refptr<GangAudioDevice> GangAudioDevice::Create(shared_ptr<GangDecoder> decoder) {
 	if (!decoder) {
 		return NULL;
 	}
@@ -125,7 +124,7 @@ int32_t GangAudioDevice::Terminate() {
 
 bool GangAudioDevice::Initialized() const {
 	SPDLOG_TRACE(console, "{}", __FUNCTION__)
-	return decoder_ != NULL;
+	return decoder_.get() != NULL;
 }
 
 int16_t GangAudioDevice::PlayoutDevices() {
@@ -256,7 +255,7 @@ int32_t GangAudioDevice::StartRecording() {
 int32_t GangAudioDevice::StopRecording() {
 	SPDLOG_TRACE(console, "{}", __FUNCTION__)
 	rtc::CritScope cs(&lock_);
-	if (decoder_) {
+	if (recording_) {
 		decoder_->SetAudioFrameObserver(NULL, NULL);
 	}
 	recording_ = false;

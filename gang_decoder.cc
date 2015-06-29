@@ -51,6 +51,16 @@ public:
 			case REC_ON:
 				dec_->SetRecOn(static_cast<RecOnMsgData*>(pmsg->pdata)->data());
 				break;
+//			case VIDEO_OBSERVER: {
+//				rtc::scoped_ptr<ObserverMsgData> data(static_cast<ObserverMsgData*>(pmsg->pdata));
+//				dec_->SetVideoObserver(data->data()->observer, data->data()->buff);
+//				break;
+//			}
+//			case AUDIO_OBSERVER: {
+//				rtc::scoped_ptr<ObserverMsgData> data(static_cast<ObserverMsgData*>(pmsg->pdata));
+//				dec_->SetAudioObserver(data->data()->observer, data->data()->buff);
+//				break;
+//			}
 			case SHUTDOWN:
 				dec_->Stop(true);
 				break;
@@ -90,9 +100,11 @@ GangDecoder::~GangDecoder() {
 	if (gang_thread_) {
 		gang_thread_->Post(gang_thread_, SHUTDOWN);
 		gang_thread_->Stop();
+		delete gang_thread_;
 		gang_thread_ = NULL;
 	}
 	::free_gang_decoder(decoder_);
+	SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "ok")
 }
 
 bool GangDecoder::Init() {
@@ -184,14 +196,24 @@ bool GangDecoder::NextFrameLoop() {
 
 // Do not call in the running thread
 bool GangDecoder::SetVideoFrameObserver(GangFrameObserver* observer, uint8_t* buff) {
-	return gang_thread_->Invoke<bool>(
+	bool previous = rtc::Thread::Current()->SetAllowBlockingCalls(true);
+	bool ok = gang_thread_->Invoke<bool>(
 			rtc::Bind(&GangDecoder::SetVideoObserver, this, observer, buff));
+	rtc::Thread::Current()->SetAllowBlockingCalls(previous);
+	return ok;
+//	 gang_thread_->Post(
+//			gang_thread_,
+//			VIDEO_OBSERVER,
+//			new ObserverMsgData(new Observer(observer, buff)));
 }
 
 // Do not call in the running thread
 bool GangDecoder::SetAudioFrameObserver(GangFrameObserver* observer, uint8_t* buff) {
-	return gang_thread_->Invoke<bool>(
+	bool previous = rtc::Thread::Current()->SetAllowBlockingCalls(true);
+	bool ok = gang_thread_->Invoke<bool>(
 			rtc::Bind(&GangDecoder::SetAudioObserver, this, observer, buff));
+	rtc::Thread::Current()->SetAllowBlockingCalls(previous);
+	return ok;
 }
 
 bool GangDecoder::SetVideoObserver(GangFrameObserver* observer, uint8_t* buff) {

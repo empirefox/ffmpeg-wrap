@@ -4,7 +4,7 @@
 
 namespace gang {
 
-GangVideoCapturer::GangVideoCapturer(GangDecoder* gang) :
+GangVideoCapturer::GangVideoCapturer(shared_ptr<GangDecoder> gang) :
 				gang_(gang),
 				start_time_ns_(0) {
 	SPDLOG_TRACE(console, "{}", __FUNCTION__)
@@ -13,14 +13,16 @@ GangVideoCapturer::GangVideoCapturer(GangDecoder* gang) :
 GangVideoCapturer::~GangVideoCapturer() {
 	SPDLOG_TRACE(console, "{}", __FUNCTION__)
 	Stop();
-	if (gang_) {
-		gang_ = NULL;
-	}
+	gang_ = NULL;
 	delete[] static_cast<char*>(captured_frame_.data);
+	SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "ok")
 }
 
-GangVideoCapturer* GangVideoCapturer::Create(GangDecoder* gang_thread) {
-	std::unique_ptr<GangVideoCapturer> capturer(new GangVideoCapturer(gang_thread));
+GangVideoCapturer* GangVideoCapturer::Create(shared_ptr<GangDecoder> gang) {
+	if (!gang.get()) {
+		return NULL;
+	}
+	std::unique_ptr<GangVideoCapturer> capturer(new GangVideoCapturer(gang));
 	if (!capturer.get()) {
 		SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "error")
 		return NULL;
@@ -44,11 +46,11 @@ void GangVideoCapturer::Initialize() {
 	captured_frame_.data_size = static_cast<uint32>(cricket::VideoFrame::SizeOf(width, height));
 	captured_frame_.data = new char[captured_frame_.data_size];
 
-	// Enumerate the supported formats. We have only one supported format. We set
-	// the frame interval to kMinimumInterval here. In Start(), if the capture
-	// format's interval is greater than kMinimumInterval, we use the interval;
-	// otherwise, we use the timestamp in the file to control the interval.
-	// TODO change supper fps to that from stream
+// Enumerate the supported formats. We have only one supported format. We set
+// the frame interval to kMinimumInterval here. In Start(), if the capture
+// format's interval is greater than kMinimumInterval, we use the interval;
+// otherwise, we use the timestamp in the file to control the interval.
+// TODO change supper fps to that from stream
 	cricket::VideoFormat format(
 			width,
 			height,
@@ -58,8 +60,8 @@ void GangVideoCapturer::Initialize() {
 	supported.push_back(format);
 	SetSupportedFormats(supported);
 
-	// TODO(wuwang): Design an E2E integration test for video adaptation,
-	// then remove the below call to disable the video adapter.
+// TODO(wuwang): Design an E2E integration test for video adaptation,
+// then remove the below call to disable the video adapter.
 	set_enable_video_adapter(false);
 }
 
@@ -71,7 +73,7 @@ CaptureState GangVideoCapturer::Start(const VideoFormat& capture_format) {
 	SetCaptureFormat(&capture_format);
 	start_time_ns_ = static_cast<int64>(rtc::TimeNanos());
 
-	if (gang_ && gang_->SetVideoFrameObserver(this, static_cast<uint8_t*>(captured_frame_.data))) {
+	if (gang_->SetVideoFrameObserver(this, static_cast<uint8_t*>(captured_frame_.data))) {
 		SPDLOG_TRACE(console, "{}: {}", __FUNCTION__, "ok")
 		return cricket::CS_RUNNING;
 	}
@@ -82,13 +84,13 @@ CaptureState GangVideoCapturer::Start(const VideoFormat& capture_format) {
 void GangVideoCapturer::Stop() {
 	SPDLOG_TRACE(console, "{}", __FUNCTION__)
 	SetCaptureFormat(NULL);
-	if (gang_) {
+	if (IsRunning()) {
 		gang_->SetVideoFrameObserver(NULL, NULL);
 	}
 }
 
 bool GangVideoCapturer::IsRunning() {
-	return gang_ && gang_->IsRunning();
+	return gang_.get() && gang_->IsRunning();
 }
 
 void GangVideoCapturer::OnGangFrame() {

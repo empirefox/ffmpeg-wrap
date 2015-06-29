@@ -1,6 +1,7 @@
 #ifndef GANG_AUDIO_DEVICE_H
 #define GANG_AUDIO_DEVICE_H
 
+#include <memory>
 #include "webrtc/base/basictypes.h"
 #include "webrtc/common_types.h"
 #include "webrtc/modules/audio_device/include/audio_device.h"
@@ -13,6 +14,7 @@ class Thread;
 
 }  // namespace rtc
 
+using std::shared_ptr;
 using webrtc::AudioDeviceModule;
 using webrtc::AudioTransport;
 using webrtc::AudioDeviceObserver;
@@ -30,7 +32,7 @@ public:
 	// Creates a GangAudioDevice or returns NULL on failure.
 	// |process_thread| is used to push and pull audio frames to and from the
 	// returned instance. Note: ownership of |process_thread| is not handed over.
-	static rtc::scoped_refptr<GangAudioDevice> Create(GangDecoder* decoder);
+	static rtc::scoped_refptr<GangAudioDevice> Create(shared_ptr<GangDecoder> decoder);
 
 	// Following functions are inherited from webrtc::AudioDeviceModule.
 	// Only functions called by PeerConnection are implemented, the rest do
@@ -173,7 +175,7 @@ protected:
 	// exposed in which case the burden of proper instantiation would be put on
 	// the creator of a GangAudioDevice instance. To create an instance of
 	// this class use the Create(..) API.
-	explicit GangAudioDevice(GangDecoder* decoder);
+	explicit GangAudioDevice(shared_ptr<GangDecoder> decoder);
 
 private:
 
@@ -191,7 +193,7 @@ private:
 	bool rec_is_initialized_; // True when the instance is ready to push audio.
 
 	// User provided thread context.
-	GangDecoder* decoder_;
+	shared_ptr<GangDecoder> decoder_;
 	// 10ms in stereo @ 96kHz
 	uint8_t rec_buff_[kMaxBufferSizeBytes];
 	int len_bytes_per_10ms_;

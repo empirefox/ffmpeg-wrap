@@ -21,12 +21,23 @@ protected:
 	}
 };
 
+//class Observer {
+//public:
+//	Observer(GangFrameObserver* _observer, uint8_t* _buff) :
+//					observer(_observer),
+//					buff(_buff) {
+//	}
+//	GangFrameObserver* observer;
+//	uint8_t* buff;
+//};
+//
+//typedef rtc::ScopedMessageData<Observer> ObserverMsgData;
 typedef rtc::TypedMessageData<bool> RecOnMsgData;
 
 class GangDecoder {
 public:
 	enum {
-		NEXT, REC_ON, SHUTDOWN
+		NEXT, REC_ON, SHUTDOWN, VIDEO_OBSERVER, AUDIO_OBSERVER
 	};
 
 	explicit GangDecoder(const std::string& url, const std::string& rec_name, bool rec_enabled);

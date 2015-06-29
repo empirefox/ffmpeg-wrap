@@ -1,9 +1,11 @@
 #ifndef GANGVIDEOCAPTURER_H_
 #define GANGVIDEOCAPTURER_H_
 
+#include <memory>
 #include "talk/media/base/videocapturer.h"
 #include "gang_decoder.h"
 
+using std::shared_ptr;
 using cricket::VideoCapturer;
 using cricket::VideoFormat;
 using cricket::CaptureState;
@@ -16,7 +18,7 @@ class GangVideoCapturer: public VideoCapturer, public GangFrameObserver {
 public:
 	virtual ~GangVideoCapturer();
 
-	static GangVideoCapturer* Create(GangDecoder* gang_thread);
+	static GangVideoCapturer* Create(shared_ptr<GangDecoder> gang);
 
 	// Override virtual methods of parent class VideoCapturer.
 	virtual CaptureState Start(const VideoFormat& capture_format);
@@ -31,14 +33,14 @@ public:
 	virtual void OnGangFrame();
 
 protected:
-	GangVideoCapturer(GangDecoder* gang);
+	GangVideoCapturer(shared_ptr<GangDecoder> gang);
 	void Initialize();
 	// Override virtual methods of parent class VideoCapturer.
 	virtual bool GetPreferredFourccs(std::vector<uint32>* fourccs);
 
 private:
 	CapturedFrame captured_frame_;
-	GangDecoder* gang_;
+	shared_ptr<GangDecoder> gang_;
 	int64 start_time_ns_;  // Time when the capturer starts.
 
 	DISALLOW_COPY_AND_ASSIGN(GangVideoCapturer);
