@@ -23,7 +23,9 @@ public:
 	}
 
 	virtual ~GangThread() {
+		SPDLOG_TRACE(console, "{}", __FUNCTION__)
 		Stop();
+		SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "ok")
 	}
 
 	// Override virtual method of parent Thread. Context: Worker Thread.
@@ -45,9 +47,11 @@ public:
 			case NEXT:
 				if (dec_->NextFrameLoop()) {
 					PostDelayed(waiting_time_ms_, this, NEXT);
-					dec_->connected_ = true;
+					if (!dec_->connected_)
+						dec_->connected_ = true;
 				} else {
-					dec_->connected_ = false;
+					if (dec_->connected_)
+						dec_->connected_ = false;
 				}
 				break;
 			case REC_ON:
@@ -64,7 +68,9 @@ public:
 //				break;
 //			}
 			case SHUTDOWN:
-				dec_->Stop(true);
+				SPDLOG_TRACE(console, "{}", __FUNCTION__)
+				Clear(this);
+				SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "ok")
 				break;
 			default:
 				break;
@@ -82,8 +88,8 @@ public:
 
 private:
 	GangDecoder* dec_;
-	mutable rtc::CriticalSection crit_;
 	int waiting_time_ms_;bool finished_;
+	mutable rtc::CriticalSection crit_;
 
 	DISALLOW_COPY_AND_ASSIGN(GangThread);
 };
@@ -103,11 +109,13 @@ GangDecoder::~GangDecoder() {
 	SPDLOG_TRACE(console, "{}", __FUNCTION__)
 	if (gang_thread_) {
 		gang_thread_->Post(gang_thread_, SHUTDOWN);
-		gang_thread_->Stop();
 		delete gang_thread_;
 		gang_thread_ = NULL;
 	}
-	::free_gang_decoder(decoder_);
+	if (decoder_) {
+		stop();
+		::free_gang_decoder(decoder_);
+	}
 	SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "ok")
 }
 
@@ -138,12 +146,21 @@ void GangDecoder::GetAudioInfo(uint32_t* sample_rate, uint8_t* channels) {
 	*channels = static_cast<uint8_t>(decoder_->channels);
 }
 
-// Check if Run() is finished.
 bool GangDecoder::IsRunning() {
 	return connected_ && gang_thread_ && !gang_thread_->Finished();
 }
 
+void GangDecoder::stop() {
+	if (connected_) {
+		connected_ = false;
+		::flush_gang_rec_encoder(decoder_);
+		::close_gang_decoder(decoder_);
+		SPDLOG_TRACE(console, "{}: {}", __FUNCTION__, "shutdown")
+	}
+}
+
 bool GangDecoder::Start() {
+	DCHECK(gang_thread_->IsCurrent());
 	SPDLOG_TRACE(console, "{}", __FUNCTION__)
 	if (gang_thread_->Finished()) {
 		return false;
@@ -160,20 +177,18 @@ bool GangDecoder::Start() {
 }
 
 void GangDecoder::Stop(bool force) {
+	DCHECK(gang_thread_->IsCurrent());
 	SPDLOG_TRACE(console, "{}: {}", __FUNCTION__, force)
 	if (!force && decoder_->rec_enabled) {
 		return;
 	}
-	if (connected_) {
-		connected_ = false;
-		::flush_gang_rec_encoder(decoder_);
-		::close_gang_decoder(decoder_);
-	}
+	stop();
 	gang_thread_->Clear(gang_thread_, NEXT);
 }
 
 // return true->continue, false->end
 bool GangDecoder::NextFrameLoop() {
+	DCHECK(gang_thread_->IsCurrent());
 	switch (::gang_decode_next_frame(decoder_)) {
 	case GANG_VIDEO_DATA:
 		if (video_frame_observer_) {
@@ -223,6 +238,7 @@ bool GangDecoder::SetAudioFrameObserver(GangFrameObserver* observer, uint8_t* bu
 }
 
 bool GangDecoder::SetVideoObserver(GangFrameObserver* observer, uint8_t* buff) {
+	DCHECK(gang_thread_->IsCurrent());
 	video_frame_observer_ = observer;
 	decoder_->video_buff = buff;
 	if (observer) {
@@ -235,6 +251,7 @@ bool GangDecoder::SetVideoObserver(GangFrameObserver* observer, uint8_t* buff) {
 }
 
 bool GangDecoder::SetAudioObserver(GangFrameObserver* observer, uint8_t* buff) {
+	DCHECK(gang_thread_->IsCurrent());
 	audio_frame_observer_ = observer;
 	decoder_->audio_buff = buff;
 	if (observer) {
@@ -253,6 +270,7 @@ void GangDecoder::SetRecordEnabled(bool enabled) {
 }
 
 void GangDecoder::SetRecOn(bool enabled) {
+	DCHECK(gang_thread_->IsCurrent());
 	if ((!decoder_->rec_enabled) == (!enabled)) {
 		return;
 	}

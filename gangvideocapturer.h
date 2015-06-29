@@ -42,8 +42,11 @@ private:
 	CapturedFrame captured_frame_;
 	shared_ptr<GangDecoder> gang_;
 	int64 start_time_ns_;  // Time when the capturer starts.
+	bool capture_;
+	mutable rtc::CriticalSection crit_;
 
 	DISALLOW_COPY_AND_ASSIGN(GangVideoCapturer);
+	void stop();
 };
 
 }  // namespace gang

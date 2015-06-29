@@ -23,6 +23,7 @@ void InitGangSpdlogConsole() {
 }
 
 void CleanupGangSpdlog() {
+	spdlog::drop("console:gang");
 	console = NULL;
 }
 

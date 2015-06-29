@@ -69,7 +69,7 @@ public:
 
 protected:
 	bool NextFrameLoop();
-	void SetRecOn(bool enabled);
+	void SetRecOn(bool enabled);;
 	// only in worker thread
 	bool SetVideoObserver(GangFrameObserver* observer, uint8_t* buff);
 	bool SetAudioObserver(GangFrameObserver* observer, uint8_t* buff);
@@ -77,6 +77,8 @@ protected:
 	bool connected_;
 
 private:
+	void stop();
+
 	class GangThread; // Forward declaration, defined in .cc.
 
 	gang_decoder* decoder_;

@@ -6,13 +6,15 @@ namespace gang {
 
 GangVideoCapturer::GangVideoCapturer(shared_ptr<GangDecoder> gang) :
 				gang_(gang),
-				start_time_ns_(0) {
+				start_time_ns_(0),
+				capture_(false) {
 	SPDLOG_TRACE(console, "{}", __FUNCTION__)
 }
 
 GangVideoCapturer::~GangVideoCapturer() {
 	SPDLOG_TRACE(console, "{}", __FUNCTION__)
-	Stop();
+	rtc::CritScope cs(&crit_);
+	stop();
 	gang_ = NULL;
 	delete[] static_cast<char*>(captured_frame_.data);
 	SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "ok")
@@ -67,7 +69,8 @@ void GangVideoCapturer::Initialize() {
 
 CaptureState GangVideoCapturer::Start(const VideoFormat& capture_format) {
 	SPDLOG_TRACE(console, "{}", __FUNCTION__)
-	if (IsRunning()) {
+	rtc::CritScope cs(&crit_);
+	if (capture_) {
 		return cricket::CS_FAILED;
 	}
 	SetCaptureFormat(&capture_format);
@@ -75,18 +78,28 @@ CaptureState GangVideoCapturer::Start(const VideoFormat& capture_format) {
 
 	if (gang_->SetVideoFrameObserver(this, static_cast<uint8_t*>(captured_frame_.data))) {
 		SPDLOG_TRACE(console, "{}: {}", __FUNCTION__, "ok")
+		capture_ = true;
 		return cricket::CS_RUNNING;
 	}
 	SPDLOG_TRACE(console, "{}: {}", __FUNCTION__, "failed")
 	return cricket::CS_FAILED;
 }
 
+void GangVideoCapturer::stop() {
+	if (capture_) {
+		capture_ = false;
+		if (IsRunning()) {
+			SetCaptureFormat(NULL);
+			gang_->SetVideoFrameObserver(NULL, NULL);
+		}
+	}
+}
+
 void GangVideoCapturer::Stop() {
 	SPDLOG_TRACE(console, "{}", __FUNCTION__)
-	SetCaptureFormat(NULL);
-	if (IsRunning()) {
-		gang_->SetVideoFrameObserver(NULL, NULL);
-	}
+	rtc::CritScope cs(&crit_);
+	stop();
+	SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "ok")
 }
 
 bool GangVideoCapturer::IsRunning() {

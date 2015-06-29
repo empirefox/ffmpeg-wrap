@@ -51,8 +51,8 @@ GangAudioDevice::~GangAudioDevice() {
 	if (recording_) {
 		recording_ = false;
 		decoder_->SetAudioFrameObserver(NULL, NULL);
-		decoder_ = NULL;
 	}
+	decoder_ = NULL;
 	SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "error")
 }
 
