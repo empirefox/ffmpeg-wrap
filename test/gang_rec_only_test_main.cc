@@ -1,6 +1,7 @@
 #include <iostream>
 #include <memory>
 
+#include "webrtc/base/thread.h"
 #include "../gang_init_deps.h"
 #include "../gang_decoder.h"
 #include "spdlog/spdlog.h"
@@ -13,7 +14,8 @@ static int run(char *i_filename, char *o_filename) {
 	int fps = 0;
 	bool rec = true;
 //	string url = "rtsp://218.204.223.237:554/live/1/0547424F573B085C/gsfp90ef4k0a6iap.sdp";
-	unique_ptr<GangDecoder> dec(new GangDecoder(i_filename, o_filename, rec));
+	unique_ptr<GangDecoder> dec(
+			new GangDecoder(i_filename, o_filename, rec, rtc::Thread::Current()));
 	printf("unique_ptr<GangDecoder>\n");
 	if (!dec.get()) {
 		printf("GangDecoder instance error\n");

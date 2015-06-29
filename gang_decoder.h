@@ -11,6 +11,8 @@
 
 namespace gang {
 
+using rtc::Thread;
+
 // need be shared_ptr
 class GangFrameObserver {
 public:
@@ -40,7 +42,11 @@ public:
 		NEXT, REC_ON, SHUTDOWN, VIDEO_OBSERVER, AUDIO_OBSERVER
 	};
 
-	explicit GangDecoder(const std::string& url, const std::string& rec_name, bool rec_enabled);
+	explicit GangDecoder(
+			const std::string& url,
+			const std::string& rec_name,
+			bool rec_enabled,
+			Thread* worker_thread);
 	~GangDecoder();
 
 	bool Init();
@@ -75,6 +81,7 @@ private:
 
 	gang_decoder* decoder_;
 	GangThread* gang_thread_;
+	Thread* worker_thread_;
 	GangFrameObserver* video_frame_observer_;
 	GangFrameObserver* audio_frame_observer_;
 

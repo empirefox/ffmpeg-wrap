@@ -11,8 +11,10 @@
 
 namespace gang {
 
+using rtc::Bind;
+
 // Take from "talk/media/devices/yuvframescapturer.h"
-class GangDecoder::GangThread: public rtc::Thread, public rtc::MessageHandler {
+class GangDecoder::GangThread: public Thread, public rtc::MessageHandler {
 public:
 	explicit GangThread(GangDecoder* dec) :
 					dec_(dec),
@@ -86,10 +88,12 @@ private:
 	DISALLOW_COPY_AND_ASSIGN(GangThread);
 };
 
-GangDecoder::GangDecoder(const std::string& url, const std::string& rec_name, bool rec_enabled) :
+GangDecoder::GangDecoder(const std::string& url, const std::string& rec_name,
+bool rec_enabled, Thread* worker_thread) :
 				connected_(false),
 				decoder_(::new_gang_decoder(url.c_str(), rec_name.c_str(), rec_enabled)),
 				gang_thread_(NULL),
+				worker_thread_(worker_thread),
 				video_frame_observer_(NULL),
 				audio_frame_observer_(NULL) {
 	SPDLOG_TRACE(console, "{}: url: {}, rec_name: {}", __FUNCTION__, url, rec_name)
@@ -108,7 +112,7 @@ GangDecoder::~GangDecoder() {
 }
 
 bool GangDecoder::Init() {
-	if (!decoder_) {
+	if (!decoder_ || !worker_thread_) {
 		return false;
 	}
 	gang_thread_ = new GangThread(this);
@@ -173,12 +177,14 @@ bool GangDecoder::NextFrameLoop() {
 	switch (::gang_decode_next_frame(decoder_)) {
 	case GANG_VIDEO_DATA:
 		if (video_frame_observer_) {
-			video_frame_observer_->OnGangFrame();
+			worker_thread_->Invoke<void>(
+					Bind(&GangFrameObserver::OnGangFrame, video_frame_observer_));
 		}
 		break;
 	case GANG_AUDIO_DATA:
 		if (audio_frame_observer_) {
-			audio_frame_observer_->OnGangFrame();
+			worker_thread_->Invoke<void>(
+					Bind(&GangFrameObserver::OnGangFrame, audio_frame_observer_));
 		}
 		break;
 	case GANG_FITAL: // end loop
@@ -196,10 +202,10 @@ bool GangDecoder::NextFrameLoop() {
 
 // Do not call in the running thread
 bool GangDecoder::SetVideoFrameObserver(GangFrameObserver* observer, uint8_t* buff) {
-	bool previous = rtc::Thread::Current()->SetAllowBlockingCalls(true);
+	bool previous = Thread::Current()->SetAllowBlockingCalls(true);
 	bool ok = gang_thread_->Invoke<bool>(
-			rtc::Bind(&GangDecoder::SetVideoObserver, this, observer, buff));
-	rtc::Thread::Current()->SetAllowBlockingCalls(previous);
+			Bind(&GangDecoder::SetVideoObserver, this, observer, buff));
+	Thread::Current()->SetAllowBlockingCalls(previous);
 	return ok;
 //	 gang_thread_->Post(
 //			gang_thread_,
@@ -209,10 +215,10 @@ bool GangDecoder::SetVideoFrameObserver(GangFrameObserver* observer, uint8_t* bu
 
 // Do not call in the running thread
 bool GangDecoder::SetAudioFrameObserver(GangFrameObserver* observer, uint8_t* buff) {
-	bool previous = rtc::Thread::Current()->SetAllowBlockingCalls(true);
+	bool previous = Thread::Current()->SetAllowBlockingCalls(true);
 	bool ok = gang_thread_->Invoke<bool>(
-			rtc::Bind(&GangDecoder::SetAudioObserver, this, observer, buff));
-	rtc::Thread::Current()->SetAllowBlockingCalls(previous);
+			Bind(&GangDecoder::SetAudioObserver, this, observer, buff));
+	Thread::Current()->SetAllowBlockingCalls(previous);
 	return ok;
 }
 
