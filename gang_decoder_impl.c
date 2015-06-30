@@ -131,10 +131,12 @@ int open_gang_decoder(gang_decoder *dec) {
 	if (!err)
 		err = init_frame(&dec->o_frame);
 
-	if (err)
+	if (err) {
 		close_gang_decoder(dec);
-	else
+	} else {
+		init_av_info(dec);
 		LOG_DEBUG("All are prepared with: audio:%d video:%d", !dec->no_video, !dec->no_audio);
+	}
 	return err;
 }
 
@@ -164,6 +166,7 @@ void close_gang_decoder(gang_decoder *dec) {
 		if (dec->rec_enabled && !(dec->ofmt_ctx->oformat->flags & AVFMT_NOFILE))
 			avio_closep(&dec->ofmt_ctx->pb);
 		avformat_free_context(dec->ofmt_ctx);
+		dec->ofmt_ctx = NULL;
 	}
 	if (dec->fscs) {
 		for (i = 0; i < dec->fsc_size; i++) {
@@ -174,6 +177,7 @@ void close_gang_decoder(gang_decoder *dec) {
 		}
 		av_freep(&dec->fscs);
 	}
+	dec->fsc_size = 0;
 	LOG_DEBUG("All are released.");
 }
 
@@ -271,7 +275,7 @@ int gang_decode_next_frame(gang_decoder* dec) {
 
 	av_free_packet(&dec->i_pkt);
 	av_init_packet(&dec->i_pkt);
-	if (av_read_frame(dec->ifmt_ctx, &dec->i_pkt) < 0) {
+	if (!dec->ifmt_ctx || av_read_frame(dec->ifmt_ctx, &dec->i_pkt) < 0) {
 		LOG_ERROR("av_read_frame error!");
 		// TODO AVERROR_EOF?
 		return GANG_FITAL;
@@ -313,7 +317,7 @@ int flush_gang_rec_encoder(gang_decoder* dec) {
 	int i;
 	int ret;
 
-	if (!dec->rec_enabled) {
+	if (!dec->ofmt_ctx || !dec->rec_enabled) {
 		return 0;
 	}
 	/* flush filters and encoders */

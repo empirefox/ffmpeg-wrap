@@ -47,11 +47,9 @@ public:
 			case NEXT:
 				if (dec_->NextFrameLoop()) {
 					PostDelayed(waiting_time_ms_, this, NEXT);
-					if (!dec_->connected_)
-						dec_->connected_ = true;
-				} else {
-					if (dec_->connected_)
-						dec_->connected_ = false;
+				} else if (dec_->connected_) {
+					dec_->connected_ = false;
+					dec_->Stop(false);
 				}
 				break;
 			case REC_ON:
@@ -115,6 +113,7 @@ GangDecoder::~GangDecoder() {
 	if (decoder_) {
 		stop();
 		::free_gang_decoder(decoder_);
+		decoder_ = NULL;
 	}
 	SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "ok")
 }
@@ -151,12 +150,10 @@ bool GangDecoder::IsRunning() {
 }
 
 void GangDecoder::stop() {
-	if (connected_) {
-		connected_ = false;
-		::flush_gang_rec_encoder(decoder_);
-		::close_gang_decoder(decoder_);
-		SPDLOG_TRACE(console, "{}: {}", __FUNCTION__, "shutdown")
-	}
+	connected_ = false;
+	::flush_gang_rec_encoder(decoder_);
+	::close_gang_decoder(decoder_);
+	SPDLOG_TRACE(console, "{}: {}", __FUNCTION__, "shutdown")
 }
 
 bool GangDecoder::Start() {
@@ -206,7 +203,6 @@ bool GangDecoder::NextFrameLoop() {
 		SPDLOG_TRACE(console, "{}: {}", __FUNCTION__, "GANG_FITAL")
 		return false;
 	case GANG_ERROR_DATA: // ignore and next
-		SPDLOG_TRACE(console, "{}: {}", __FUNCTION__, "GANG_ERROR_DATA")
 		break;
 	default: // unexpected, so end loop
 		console->error() << "Unknow ret code from decoder!";
@@ -244,7 +240,7 @@ bool GangDecoder::SetVideoObserver(GangFrameObserver* observer, uint8_t* buff) {
 	if (observer) {
 		return Start();
 	}
-	if (!audio_frame_observer_ && connected_) {
+	if (!audio_frame_observer_) {
 		Stop(false);
 	}
 	return false;
@@ -257,7 +253,7 @@ bool GangDecoder::SetAudioObserver(GangFrameObserver* observer, uint8_t* buff) {
 	if (observer) {
 		return Start();
 	}
-	if (!video_frame_observer_ && connected_) {
+	if (!video_frame_observer_) {
 		Stop(false);
 	}
 	return false;

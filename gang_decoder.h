@@ -69,7 +69,8 @@ public:
 
 protected:
 	bool NextFrameLoop();
-	void SetRecOn(bool enabled);;
+	void SetRecOn(bool enabled);
+	;
 	// only in worker thread
 	bool SetVideoObserver(GangFrameObserver* observer, uint8_t* buff);
 	bool SetAudioObserver(GangFrameObserver* observer, uint8_t* buff);

@@ -16,7 +16,9 @@ GangVideoCapturer::~GangVideoCapturer() {
 	rtc::CritScope cs(&crit_);
 	stop();
 	gang_ = NULL;
-	delete[] static_cast<char*>(captured_frame_.data);
+	if (captured_frame_.data) {
+		delete[] static_cast<char*>(captured_frame_.data);
+	}
 	SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "ok")
 }
 
