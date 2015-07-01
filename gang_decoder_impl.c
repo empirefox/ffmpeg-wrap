@@ -52,8 +52,12 @@ gang_decoder *new_gang_decoder(const char *url, const char *rec_name, int record
 
 void free_gang_decoder(gang_decoder *dec) {
 	if (dec) {
-		free(dec->url);
-		free(dec->rec_name);
+		if (dec->url) {
+			av_freep(&dec->url);
+		}
+		if (dec->rec_name) {
+			av_freep(&dec->rec_name);
+		}
 		free(dec);
 	}
 }
@@ -171,7 +175,9 @@ void close_gang_decoder(gang_decoder *dec) {
 	if (dec->fscs) {
 		for (i = 0; i < dec->fsc_size; i++) {
 			if (dec->fscs[i].filter_graph) {
-				free(dec->fscs[i].filter_spec);
+				if (dec->fscs[i].filter_spec) {
+					av_freep(&dec->fscs[i].filter_spec);
+				}
 				avfilter_graph_free(&dec->fscs[i].filter_graph);
 			}
 		}

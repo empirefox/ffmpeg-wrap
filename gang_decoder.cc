@@ -96,10 +96,11 @@ GangDecoder::GangDecoder(const std::string& url, const std::string& rec_name,
 bool rec_enabled, Thread* worker_thread) :
 				connected_(false),
 				decoder_(::new_gang_decoder(url.c_str(), rec_name.c_str(), rec_enabled)),
-				gang_thread_(NULL),
+				gang_thread_(new GangThread(this)),
 				worker_thread_(worker_thread),
 				video_frame_observer_(NULL),
 				audio_frame_observer_(NULL) {
+	gang_thread_->Start();
 	SPDLOG_TRACE(console, "{}: url: {}, rec_name: {}", __FUNCTION__, url, rec_name)
 }
 
@@ -122,8 +123,7 @@ bool GangDecoder::Init() {
 	if (!decoder_ || !worker_thread_) {
 		return false;
 	}
-	gang_thread_ = new GangThread(this);
-	return gang_thread_->Start() && !::init_gang_av_info(decoder_);
+	return !::init_gang_av_info(decoder_);
 }
 
 bool GangDecoder::IsVideoAvailable() {
