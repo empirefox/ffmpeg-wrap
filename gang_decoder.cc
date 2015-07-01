@@ -4,9 +4,6 @@
 #include "webrtc/base/bind.h"
 
 #include "gang_spdlog_console.h"
-#ifdef LOG_ERR
-#undef LOG_ERR
-#endif
 #include "gang_decoder_impl.h"
 
 namespace gang {

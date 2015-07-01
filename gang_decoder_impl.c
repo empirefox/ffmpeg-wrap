@@ -46,6 +46,8 @@ gang_decoder *new_gang_decoder(const char *url, const char *rec_name, int record
 		dec->fsc_size = 0;
 		dec->i_frame = NULL;
 		dec->o_frame = NULL;
+		av_init_packet(&dec->i_pkt);
+		av_init_packet(&dec->o_pkt);
 	}
 	return dec;
 }
@@ -149,6 +151,8 @@ void close_gang_decoder(gang_decoder *dec) {
 
 	av_free_packet(&dec->i_pkt);
 	av_free_packet(&dec->o_pkt);
+	av_init_packet(&dec->i_pkt);
+	av_init_packet(&dec->o_pkt);
 	if (dec->o_frame) {
 		av_frame_unref(dec->o_frame);
 		av_frame_free(&dec->o_frame);
