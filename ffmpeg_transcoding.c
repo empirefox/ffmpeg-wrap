@@ -59,7 +59,7 @@ int open_input_streams(
 		FilterStreamContext **fscs,
 		size_t *fs_size) {
 
-	FilterStreamContext *fs_ctx;
+	FilterStreamContext *fs_ctx = NULL;
 	AVStream *i_v_s = NULL;
 	AVStream *i_a_s = NULL;
 	size_t stream_size = 0;

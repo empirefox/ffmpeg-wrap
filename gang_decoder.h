@@ -23,17 +23,17 @@ protected:
 	}
 };
 
-//class Observer {
-//public:
-//	Observer(GangFrameObserver* _observer, uint8_t* _buff) :
-//					observer(_observer),
-//					buff(_buff) {
-//	}
-//	GangFrameObserver* observer;
-//	uint8_t* buff;
-//};
-//
-//typedef rtc::ScopedMessageData<Observer> ObserverMsgData;
+class Observer {
+public:
+	Observer(GangFrameObserver* _observer, uint8_t* _buff) :
+					observer(_observer),
+					buff(_buff) {
+	}
+	GangFrameObserver* observer;
+	uint8_t* buff;
+};
+
+typedef rtc::ScopedMessageData<Observer> ObserverMsgData;
 typedef rtc::TypedMessageData<bool> RecOnMsgData;
 
 class GangDecoder {
@@ -59,8 +59,8 @@ public:
 	bool IsVideoAvailable();
 	bool IsAudioAvailable();
 
-	bool SetVideoFrameObserver(GangFrameObserver* observer, uint8_t* buff);
-	bool SetAudioFrameObserver(GangFrameObserver* observer, uint8_t* buff);
+	void SetVideoFrameObserver(GangFrameObserver* observer, uint8_t* buff);
+	void SetAudioFrameObserver(GangFrameObserver* observer, uint8_t* buff);
 
 	void GetVideoInfo(int* width, int* height, int* fps);
 	void GetAudioInfo(uint32_t* sample_rate, uint8_t* channels);
@@ -70,7 +70,7 @@ public:
 protected:
 	bool NextFrameLoop();
 	void SetRecOn(bool enabled);
-	;
+
 	// only in worker thread
 	bool SetVideoObserver(GangFrameObserver* observer, uint8_t* buff);
 	bool SetAudioObserver(GangFrameObserver* observer, uint8_t* buff);

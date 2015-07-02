@@ -1,6 +1,5 @@
 eclipse.preferences.version=1
-environment/project/cdt.managedbuild.config.gnu.exe.debug.1586952284/PKG_CONFIG_PATH/delimiter=\:
-environment/project/cdt.managedbuild.config.gnu.exe.debug.1586952284/PKG_CONFIG_PATH/operation=append
-environment/project/cdt.managedbuild.config.gnu.exe.debug.1586952284/PKG_CONFIG_PATH/value=PKG_CONFIG_PATH\:/home/savage/soft/webrtc/webrtc-linux64/lib/Release/pkgconfig
 environment/project/cdt.managedbuild.config.gnu.exe.debug.1586952284/append=true
 environment/project/cdt.managedbuild.config.gnu.exe.debug.1586952284/appendContributed=true
+environment/project/cdt.managedbuild.config.gnu.exe.release.263373001/append=true
+environment/project/cdt.managedbuild.config.gnu.exe.release.263373001/appendContributed=true

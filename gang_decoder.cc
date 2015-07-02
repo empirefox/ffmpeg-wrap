@@ -52,22 +52,23 @@ public:
 			case REC_ON:
 				dec_->SetRecOn(static_cast<RecOnMsgData*>(pmsg->pdata)->data());
 				break;
-//			case VIDEO_OBSERVER: {
-//				rtc::scoped_ptr<ObserverMsgData> data(static_cast<ObserverMsgData*>(pmsg->pdata));
-//				dec_->SetVideoObserver(data->data()->observer, data->data()->buff);
-//				break;
-//			}
-//			case AUDIO_OBSERVER: {
-//				rtc::scoped_ptr<ObserverMsgData> data(static_cast<ObserverMsgData*>(pmsg->pdata));
-//				dec_->SetAudioObserver(data->data()->observer, data->data()->buff);
-//				break;
-//			}
+			case VIDEO_OBSERVER: {
+				rtc::scoped_ptr<ObserverMsgData> data(static_cast<ObserverMsgData*>(pmsg->pdata));
+				dec_->SetVideoObserver(data->data()->observer, data->data()->buff);
+				break;
+			}
+			case AUDIO_OBSERVER: {
+				rtc::scoped_ptr<ObserverMsgData> data(static_cast<ObserverMsgData*>(pmsg->pdata));
+				dec_->SetAudioObserver(data->data()->observer, data->data()->buff);
+				break;
+			}
 			case SHUTDOWN:
 				SPDLOG_TRACE(console, "{}", __FUNCTION__)
 				Clear(this);
 				SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "ok")
 				break;
 			default:
+				console->error("{} {}", __FUNCTION__, "unexpected msg type");
 				break;
 			}
 		} else {
@@ -208,26 +209,25 @@ bool GangDecoder::NextFrameLoop() {
 	return true;
 }
 
-// Do not call in the running thread
-bool GangDecoder::SetVideoFrameObserver(GangFrameObserver* observer, uint8_t* buff) {
-	bool previous = Thread::Current()->SetAllowBlockingCalls(true);
-	bool ok = gang_thread_->Invoke<bool>(
-			Bind(&GangDecoder::SetVideoObserver, this, observer, buff));
-	Thread::Current()->SetAllowBlockingCalls(previous);
-	return ok;
-//	 gang_thread_->Post(
-//			gang_thread_,
-//			VIDEO_OBSERVER,
-//			new ObserverMsgData(new Observer(observer, buff)));
+// Called by webrtc worker thread
+void GangDecoder::SetVideoFrameObserver(GangFrameObserver* observer, uint8_t* buff) {
+//	bool previous = Thread::Current()->SetAllowBlockingCalls(true);
+//	bool ok = gang_thread_->Invoke<bool>(
+//			Bind(&GangDecoder::SetVideoObserver, this, observer, buff));
+//	Thread::Current()->SetAllowBlockingCalls(previous);
+//	return ok;
+	gang_thread_->Post(
+			gang_thread_,
+			VIDEO_OBSERVER,
+			new ObserverMsgData(new Observer(observer, buff)));
 }
 
-// Do not call in the running thread
-bool GangDecoder::SetAudioFrameObserver(GangFrameObserver* observer, uint8_t* buff) {
-	bool previous = Thread::Current()->SetAllowBlockingCalls(true);
-	bool ok = gang_thread_->Invoke<bool>(
-			Bind(&GangDecoder::SetAudioObserver, this, observer, buff));
-	Thread::Current()->SetAllowBlockingCalls(previous);
-	return ok;
+// Called by webrtc worker thread
+void GangDecoder::SetAudioFrameObserver(GangFrameObserver* observer, uint8_t* buff) {
+	gang_thread_->Post(
+			gang_thread_,
+			AUDIO_OBSERVER,
+			new ObserverMsgData(new Observer(observer, buff)));
 }
 
 bool GangDecoder::SetVideoObserver(GangFrameObserver* observer, uint8_t* buff) {

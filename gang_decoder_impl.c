@@ -8,8 +8,10 @@
 
 #include "ffmpeg_transcoding.h"
 #include "ffmpeg_format.h"
+#include "ffmpeg_log.h"
 
 void initialize_gang_decoder_globel() {
+	init_gang_av_log();
 	avcodec_register_all();
 	av_register_all();
 	avformat_network_init();
@@ -206,7 +208,7 @@ static int copy_send_frame(gang_decoder* dec, FilterStreamContext *fsc) {
 	else if (!fsc->is_video && dec->audio_buff)
 		memcpy(dec->audio_buff, dec->o_frame->extended_data[0], dec->audio_buff_size);
 	else {
-		LOG_ERROR(
+		LOG_INFO(
 				"is_video:%d, no video_buff:%d, no audio_buff:%d",
 				fsc->is_video,
 				!dec->video_buff,

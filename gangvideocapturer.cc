@@ -78,13 +78,10 @@ CaptureState GangVideoCapturer::Start(const VideoFormat& capture_format) {
 	SetCaptureFormat(&capture_format);
 	start_time_ns_ = static_cast<int64>(rtc::TimeNanos());
 
-	if (gang_->SetVideoFrameObserver(this, static_cast<uint8_t*>(captured_frame_.data))) {
-		SPDLOG_TRACE(console, "{}: {}", __FUNCTION__, "ok")
-		capture_ = true;
-		return cricket::CS_RUNNING;
-	}
-	SPDLOG_TRACE(console, "{}: {}", __FUNCTION__, "failed")
-	return cricket::CS_FAILED;
+	gang_->SetVideoFrameObserver(this, static_cast<uint8_t*>(captured_frame_.data));
+	capture_ = true;
+	SPDLOG_TRACE(console, "{}: {}", __FUNCTION__, "ok")
+	return cricket::CS_RUNNING;
 }
 
 void GangVideoCapturer::stop() {
