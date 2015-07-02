@@ -144,7 +144,7 @@ void GangDecoder::GetAudioInfo(uint32_t* sample_rate, uint8_t* channels) {
 }
 
 bool GangDecoder::IsRunning() {
-	return connected_ && gang_thread_ && !gang_thread_->Finished();
+	return gang_thread_ && !gang_thread_->Finished();
 }
 
 void GangDecoder::stop() {
