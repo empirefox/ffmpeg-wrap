@@ -4,7 +4,8 @@
 
 namespace gang {
 
-GangVideoCapturer::GangVideoCapturer(shared_ptr<GangDecoder> gang) :
+GangVideoCapturer::GangVideoCapturer(shared_ptr<GangDecoder> gang, rtc::Thread* thread) :
+				VideoCapturer(thread),
 				gang_(gang),
 				start_time_ns_(0),
 				capture_(false) {
@@ -22,11 +23,11 @@ GangVideoCapturer::~GangVideoCapturer() {
 	SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "ok")
 }
 
-GangVideoCapturer* GangVideoCapturer::Create(shared_ptr<GangDecoder> gang) {
-	if (!gang.get()) {
+GangVideoCapturer* GangVideoCapturer::Create(shared_ptr<GangDecoder> gang, rtc::Thread* thread) {
+	if (!gang.get() || !thread) {
 		return NULL;
 	}
-	std::unique_ptr<GangVideoCapturer> capturer(new GangVideoCapturer(gang));
+	std::unique_ptr<GangVideoCapturer> capturer(new GangVideoCapturer(gang, thread));
 	if (!capturer.get()) {
 		SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "error")
 		return NULL;

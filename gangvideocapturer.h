@@ -18,7 +18,7 @@ class GangVideoCapturer: public VideoCapturer, public GangFrameObserver {
 public:
 	virtual ~GangVideoCapturer();
 
-	static GangVideoCapturer* Create(shared_ptr<GangDecoder> gang);
+	static GangVideoCapturer* Create(shared_ptr<GangDecoder> gang, rtc::Thread* thread);
 
 	// Override virtual methods of parent class VideoCapturer.
 	virtual CaptureState Start(const VideoFormat& capture_format);
@@ -33,7 +33,7 @@ public:
 	virtual void OnGangFrame();
 
 protected:
-	GangVideoCapturer(shared_ptr<GangDecoder> gang);
+	explicit GangVideoCapturer(shared_ptr<GangDecoder> gang, rtc::Thread* thread);
 	void Initialize();
 	// Override virtual methods of parent class VideoCapturer.
 	virtual bool GetPreferredFourccs(std::vector<uint32>* fourccs);
