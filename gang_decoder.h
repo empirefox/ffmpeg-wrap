@@ -13,6 +13,18 @@ namespace gang {
 
 using rtc::Thread;
 
+typedef enum GangStatus {
+	Alive, Dead
+} GangStatus;
+
+// Thread safe is the user's responsibility
+class StatusObserver {
+public:
+	virtual void OnStatusChange(const std::string& id, GangStatus status) = 0;
+	virtual ~StatusObserver() {
+	}
+};
+
 // need be shared_ptr
 class GangFrameObserver {
 public:
@@ -43,10 +55,12 @@ public:
 	};
 
 	explicit GangDecoder(
+			const std::string& id,
 			const std::string& url,
 			const std::string& rec_name,
 			bool rec_enabled,
-			Thread* worker_thread);
+			Thread* worker_thread,
+			StatusObserver* status_observer);
 	~GangDecoder();
 
 	bool Init();
@@ -66,6 +80,7 @@ public:
 	void GetAudioInfo(uint32_t* sample_rate, uint8_t* channels);
 
 	void SetRecordEnabled(bool enabled);
+	void SendStatus(GangStatus status);
 
 protected:
 	bool NextFrameLoop();
@@ -82,11 +97,13 @@ private:
 
 	class GangThread; // Forward declaration, defined in .cc.
 
+	const std::string id_;
 	gang_decoder* decoder_;
 	GangThread* gang_thread_;
 	Thread* worker_thread_;
 	GangFrameObserver* video_frame_observer_;
 	GangFrameObserver* audio_frame_observer_;
+	StatusObserver* status_observer_;
 
 	DISALLOW_COPY_AND_ASSIGN(GangDecoder);
 };

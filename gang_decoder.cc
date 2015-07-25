@@ -90,14 +90,16 @@ private:
 	DISALLOW_COPY_AND_ASSIGN(GangThread);
 };
 
-GangDecoder::GangDecoder(const std::string& url, const std::string& rec_name,
-bool rec_enabled, Thread* worker_thread) :
+GangDecoder::GangDecoder(const std::string& id, const std::string& url, const std::string& rec_name,
+bool rec_enabled, Thread* worker_thread, StatusObserver* status_observer) :
 				connected_(false),
+				id_(id),
 				decoder_(::new_gang_decoder(url.c_str(), rec_name.c_str(), rec_enabled)),
 				gang_thread_(new GangThread(this)),
 				worker_thread_(worker_thread),
 				video_frame_observer_(NULL),
-				audio_frame_observer_(NULL) {
+				audio_frame_observer_(NULL),
+				status_observer_(status_observer) {
 	gang_thread_->Start();
 	SPDLOG_TRACE(console, "{}: url: {}, rec_name: {}", __FUNCTION__, url, rec_name)
 }
@@ -162,6 +164,11 @@ bool GangDecoder::Start() {
 	}
 	if (!connected_) {
 		connected_ = !::open_gang_decoder(decoder_);
+		if (connected_) {
+			SendStatus(Alive);
+		} else {
+			SendStatus(Dead);
+		}
 	}
 	if (!connected_) {
 		return false;
@@ -199,11 +206,13 @@ bool GangDecoder::NextFrameLoop() {
 		break;
 	case GANG_FITAL: // end loop
 		SPDLOG_TRACE(console, "{}: {}", __FUNCTION__, "GANG_FITAL")
+		SendStatus(Dead);
 		return false;
 	case GANG_ERROR_DATA: // ignore and next
 		break;
 	default: // unexpected, so end loop
 		console->error() << "Unknow ret code from decoder!";
+		SendStatus(Dead);
 		return false;
 	}
 	return true;
@@ -272,6 +281,12 @@ void GangDecoder::SetRecOn(bool enabled) {
 	if (enabled || video_frame_observer_ || audio_frame_observer_) {
 		SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "restart")
 		Start();
+	}
+}
+
+void GangDecoder::SendStatus(GangStatus status) {
+	if (status_observer_) {
+		status_observer_->OnStatusChange(id_, status);
 	}
 }
 
