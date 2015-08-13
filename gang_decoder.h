@@ -51,7 +51,7 @@ typedef rtc::TypedMessageData<bool> RecOnMsgData;
 class GangDecoder {
 public:
 	enum {
-		NEXT, REC_ON, SHUTDOWN, VIDEO_OBSERVER, AUDIO_OBSERVER
+		NEXT, REC_ON, START_REC, SHUTDOWN, VIDEO_OBSERVER, AUDIO_OBSERVER
 	};
 
 	explicit GangDecoder(
@@ -81,6 +81,8 @@ public:
 
 	void SetRecordEnabled(bool enabled);
 	void SendStatus(GangStatus status);
+
+	void StartRec();
 
 protected:
 	bool NextFrameLoop();

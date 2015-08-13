@@ -45,8 +45,7 @@ public:
 				if (dec_->NextFrameLoop()) {
 					PostDelayed(waiting_time_ms_, this, NEXT);
 				} else if (dec_->connected_) {
-					dec_->connected_ = false;
-					dec_->Stop(false);
+					dec_->Stop(true);
 				}
 				break;
 			case REC_ON:
@@ -62,6 +61,9 @@ public:
 				dec_->SetAudioObserver(data->data()->observer, data->data()->buff);
 				break;
 			}
+			case START_REC:
+				dec_->Start();
+				break;
 			case SHUTDOWN:
 				SPDLOG_TRACE(console, "{}", __FUNCTION__)
 				Clear(this);
@@ -287,6 +289,12 @@ void GangDecoder::SetRecOn(bool enabled) {
 void GangDecoder::SendStatus(GangStatus status) {
 	if (status_observer_) {
 		status_observer_->OnStatusChange(id_, status);
+	}
+}
+
+void GangDecoder::StartRec() {
+	if (decoder_->rec_enabled) {
+		gang_thread_->Post(gang_thread_, START_REC);
 	}
 }
 
