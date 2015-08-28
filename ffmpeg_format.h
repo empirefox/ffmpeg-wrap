@@ -32,7 +32,8 @@ int open_input_file(
 		const char *filename,
 		AVFormatContext **input_format_context,
 		AVStream **video_stream,
-		AVStream **audio_stream);
+		AVStream **audio_stream,
+		int audio_off);
 
 /** Initialize one audio frame for reading from the input file */
 int init_frame(AVFrame **frame);

@@ -33,8 +33,10 @@ typedef struct gang_decoder {
 	char *url;
 	char *rec_name;
 	int rec_enabled;
+	int audio_off;
 	int no_video;
 	int no_audio;
+	int waitkey;
 
 	//vidio
 	int width;

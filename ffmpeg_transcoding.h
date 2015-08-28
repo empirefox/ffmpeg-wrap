@@ -14,11 +14,7 @@ extern "C" {
 
 #include "gang_dec.h"
 
-int open_input_streams(
-		const char *url,
-		AVFormatContext **ifmt_ctx,
-		FilterStreamContext **fscs,
-		size_t *fs_size);
+int open_input_streams(gang_decoder* dec);
 
 int open_output_streams(
 		const char *filename,

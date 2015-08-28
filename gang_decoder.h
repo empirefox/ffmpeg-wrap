@@ -59,6 +59,7 @@ public:
 			const std::string& url,
 			const std::string& rec_name,
 			bool rec_enabled,
+			bool audio_off,
 			Thread* worker_thread,
 			StatusObserver* status_observer);
 	~GangDecoder();

@@ -23,14 +23,16 @@ void cleanup_gang_decoder_globel() {
 }
 
 // create gang_decode with given url
-gang_decoder *new_gang_decoder(const char *url, const char *rec_name, int record_enabled) {
+gang_decoder *new_gang_decoder(const char *url, const char *rec_name, int rec_on, int audio_off) {
 	gang_decoder *dec = (gang_decoder*) malloc(sizeof(gang_decoder));
 	if (dec) {
 		dec->url = av_strdup(url);
 		dec->rec_name = av_strdup(rec_name);
-		dec->rec_enabled = record_enabled;
+		dec->rec_enabled = rec_on;
+		dec->audio_off = audio_off;
 		dec->no_video = 1;
 		dec->no_audio = 1;
+		dec->waitkey = 1;
 		dec->width = 0;
 		dec->height = 0;
 		dec->fps = 0;
@@ -81,7 +83,7 @@ static void init_av_info(gang_decoder *dec) {
 					dec->width,
 					dec->height,
 					1);
-			AVRational rate = fsc.os->r_frame_rate;
+			AVRational rate = fsc.is->r_frame_rate;
 			if (rate.den) {
 				dec->fps = rate.num / rate.den;
 			} else {
@@ -111,7 +113,7 @@ static void init_av_info(gang_decoder *dec) {
 
 int init_gang_av_info(gang_decoder *dec) {
 	int err;
-	err = open_input_streams(dec->url, &dec->ifmt_ctx, &dec->fscs, &dec->fsc_size);
+	err = open_input_streams(dec);
 	if (!err)
 		err = open_output_streams(dec->rec_name, &dec->ofmt_ctx, dec->fscs, dec->fsc_size, 0);
 	if (!err)
@@ -124,7 +126,7 @@ int init_gang_av_info(gang_decoder *dec) {
 int open_gang_decoder(gang_decoder *dec) {
 	int err;
 
-	err = open_input_streams(dec->url, &dec->ifmt_ctx, &dec->fscs, &dec->fsc_size);
+	err = open_input_streams(dec);
 	if (!err)
 		err = open_output_streams(
 				dec->rec_name,
@@ -254,7 +256,7 @@ static int filter_encode_write_frame(gang_decoder* dec, FilterStreamContext *fsc
 			not_eof = 0;
 			ret = copy_send_frame(dec, fsc);
 			if (ret < 0) {
-				LOG_INFO("copy and send frame to rtc error");
+				LOG_DEBUG("copy and send frame to rtc error");
 				break;
 			}
 		}
@@ -263,7 +265,7 @@ static int filter_encode_write_frame(gang_decoder* dec, FilterStreamContext *fsc
 		if (dec->rec_enabled) {
 			ret = encode_write_frame(dec, fsc, NULL);
 			if (ret < 0) {
-				LOG_INFO("encode_write_frame error");
+				LOG_DEBUG("encode_write_frame error");
 				break;
 			}
 		}
@@ -319,7 +321,7 @@ int gang_decode_next_frame(gang_decoder* dec) {
 			return GANG_VIDEO_DATA;
 		if (!fsc.is_video && dec->audio_buff)
 			return GANG_AUDIO_DATA;
-		LOG_INFO("Unexpected type");
+		LOG_DEBUG("Unexpected type");
 	}
 
 	return GANG_ERROR_DATA;
@@ -341,16 +343,17 @@ int flush_gang_rec_encoder(gang_decoder* dec) {
 		ret = filter_encode_write_frame(dec, &dec->fscs[i], 0);
 		if (ret < 0) {
 			LOG_INFO("Flushing filter failed");
-			return ret;
+			break;
 		}
 
 		/* flush encoder */
 		ret = flush_encoder(dec, &dec->fscs[i]);
 		if (ret < 0) {
 			LOG_INFO("Flushing encoder failed");
-			return ret;
+			break;
 		}
 	}
+	dec->waitkey = 1;
 
 	ret = av_write_trailer(dec->ofmt_ctx);
 	if (ret)

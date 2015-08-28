@@ -15,7 +15,7 @@ void initialize_gang_decoder_globel();
 void cleanup_gang_decoder_globel();
 
 // create gang_decode with given url
-gang_decoder* new_gang_decoder(const char* url, const char *rec_name, int record_enabled);
+gang_decoder* new_gang_decoder(const char* url, const char *rec_name, int record_enabled, int audio_off);
 
 // free gang_decoder
 void free_gang_decoder(gang_decoder* dec);

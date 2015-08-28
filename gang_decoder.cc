@@ -93,10 +93,10 @@ private:
 };
 
 GangDecoder::GangDecoder(const std::string& id, const std::string& url, const std::string& rec_name,
-bool rec_enabled, Thread* worker_thread, StatusObserver* status_observer) :
+bool rec_on, bool audio_off, Thread* worker_thread, StatusObserver* status_observer) :
 				connected_(false),
 				id_(id),
-				decoder_(::new_gang_decoder(url.c_str(), rec_name.c_str(), rec_enabled)),
+				decoder_(::new_gang_decoder(url.c_str(), rec_name.c_str(), rec_on, audio_off)),
 				gang_thread_(new GangThread(this)),
 				worker_thread_(worker_thread),
 				video_frame_observer_(NULL),

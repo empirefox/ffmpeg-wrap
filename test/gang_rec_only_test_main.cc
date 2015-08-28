@@ -13,10 +13,18 @@ static int run(char *i_filename, char *o_filename) {
 	int heith = 0;
 	int fps = 0;
 	bool rec = true;
+	bool audio_off = false;
 	const std::string id = "";
 //	string url = "rtsp://218.204.223.237:554/live/1/0547424F573B085C/gsfp90ef4k0a6iap.sdp";
 	unique_ptr<GangDecoder> dec(
-			new GangDecoder(id, i_filename, o_filename, rec, rtc::Thread::Current(), NULL));
+			new GangDecoder(
+					id,
+					i_filename,
+					o_filename,
+					rec,
+					audio_off,
+					rtc::Thread::Current(),
+					NULL));
 	printf("unique_ptr<GangDecoder>\n");
 	if (!dec.get()) {
 		printf("GangDecoder instance error\n");
