@@ -42,7 +42,7 @@ public:
 		if (dec_) {
 			switch (pmsg->message_id) {
 			case NEXT:
-				if (dec_->NextFrameLoop()) {
+				if (dec_->connected_ && dec_->NextFrameLoop()) {
 					PostDelayed(waiting_time_ms_, this, NEXT);
 				} else if (dec_->connected_) {
 					dec_->Stop(true);
@@ -51,14 +51,19 @@ public:
 			case REC_ON:
 				dec_->SetRecOn(static_cast<RecOnMsgData*>(pmsg->pdata)->data());
 				break;
-			case VIDEO_OBSERVER: {
+			case VIDEO_START: {
 				rtc::scoped_ptr<ObserverMsgData> data(static_cast<ObserverMsgData*>(pmsg->pdata));
-				dec_->SetVideoObserver(data->data()->observer, data->data()->buff);
+				dec_->StartVideoCapture_g(data->data()->observer, data->data()->buff);
+				break;
+			}
+			case VIDEO_STOP: {
+				rtc::scoped_ptr<ObserverMsgData> data(static_cast<ObserverMsgData*>(pmsg->pdata));
+				dec_->StopVideoCapture_g(data->data()->observer);
 				break;
 			}
 			case AUDIO_OBSERVER: {
 				rtc::scoped_ptr<ObserverMsgData> data(static_cast<ObserverMsgData*>(pmsg->pdata));
-				dec_->SetAudioObserver(data->data()->observer, data->data()->buff);
+				dec_->SetAudioObserver_g(data->data()->observer, data->data()->buff);
 				break;
 			}
 			case START_REC:
@@ -66,7 +71,10 @@ public:
 				break;
 			case SHUTDOWN:
 				SPDLOG_TRACE(console, "{}", __FUNCTION__)
+				if (dec_->connected_)
+					dec_->stop();
 				Clear(this);
+				Quit();
 				SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "ok")
 				break;
 			default:
@@ -114,9 +122,17 @@ GangDecoder::~GangDecoder() {
 		gang_thread_ = NULL;
 	}
 	if (decoder_) {
-		stop();
 		::free_gang_decoder(decoder_);
 		decoder_ = NULL;
+	}
+	SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "ok")
+}
+
+void GangDecoder::Shutdown() {
+	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	if (gang_thread_) {
+		gang_thread_->Post(gang_thread_, SHUTDOWN);
+		gang_thread_->Stop();
 	}
 	SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "ok")
 }
@@ -136,19 +152,16 @@ bool GangDecoder::IsAudioAvailable() {
 	return !decoder_->no_audio;
 }
 
-void GangDecoder::GetVideoInfo(int* width, int* height, int* fps) {
+void GangDecoder::GetVideoInfo(int* width, int* height, int* fps, uint32* buf_size) {
 	*width = decoder_->width;
 	*height = decoder_->height;
 	*fps = decoder_->fps;
+	*buf_size = static_cast<uint32>(decoder_->video_buff_size);
 }
 
 void GangDecoder::GetAudioInfo(uint32_t* sample_rate, uint8_t* channels) {
 	*sample_rate = static_cast<uint32_t>(decoder_->sample_rate);
 	*channels = static_cast<uint8_t>(decoder_->channels);
-}
-
-bool GangDecoder::IsRunning() {
-	return gang_thread_ && !gang_thread_->Finished();
 }
 
 void GangDecoder::stop() {
@@ -188,6 +201,7 @@ void GangDecoder::Stop(bool force) {
 	}
 	stop();
 	gang_thread_->Clear(gang_thread_, NEXT);
+	SPDLOG_TRACE(console, "{}: {}", __FUNCTION__, "ok")
 }
 
 // return true->continue, false->end
@@ -196,8 +210,7 @@ bool GangDecoder::NextFrameLoop() {
 	switch (::gang_decode_next_frame(decoder_)) {
 	case GANG_VIDEO_DATA:
 		if (video_frame_observer_) {
-			worker_thread_->Invoke<void>(
-					Bind(&GangFrameObserver::OnGangFrame, video_frame_observer_));
+			video_frame_observer_->OnGangFrame();
 		}
 		break;
 	case GANG_AUDIO_DATA:
@@ -221,16 +234,34 @@ bool GangDecoder::NextFrameLoop() {
 }
 
 // Called by webrtc worker thread
-void GangDecoder::SetVideoFrameObserver(GangFrameObserver* observer, uint8_t* buff) {
-//	bool previous = Thread::Current()->SetAllowBlockingCalls(true);
-//	bool ok = gang_thread_->Invoke<bool>(
-//			Bind(&GangDecoder::SetVideoObserver, this, observer, buff));
-//	Thread::Current()->SetAllowBlockingCalls(previous);
-//	return ok;
+void GangDecoder::StartVideoCapture(GangFrameObserver* observer, uint8_t* buff) {
+	DCHECK(observer);
+	DCHECK(buff);
 	gang_thread_->Post(
 			gang_thread_,
-			VIDEO_OBSERVER,
+			VIDEO_START,
 			new ObserverMsgData(new Observer(observer, buff)));
+}
+void GangDecoder::StartVideoCapture_g(GangFrameObserver* observer, uint8_t* buff) {
+	DCHECK(gang_thread_->IsCurrent());
+	video_frame_observer_ = observer;
+	decoder_->video_buff = buff;
+	observer->OnVideoStarted(Start());
+}
+
+// Called by webrtc worker thread
+void GangDecoder::StopVideoCapture(GangFrameObserver* observer) {
+	DCHECK(observer);
+	gang_thread_->Post(gang_thread_, VIDEO_STOP, new ObserverMsgData(new Observer(observer, NULL)));
+}
+void GangDecoder::StopVideoCapture_g(GangFrameObserver* observer) {
+	DCHECK(gang_thread_->IsCurrent());
+	video_frame_observer_ = NULL;
+	decoder_->video_buff = NULL;
+	observer->OnVideoStopped();
+	if (!audio_frame_observer_) {
+		Stop(false);
+	}
 }
 
 // Called by webrtc worker thread
@@ -241,30 +272,17 @@ void GangDecoder::SetAudioFrameObserver(GangFrameObserver* observer, uint8_t* bu
 			new ObserverMsgData(new Observer(observer, buff)));
 }
 
-bool GangDecoder::SetVideoObserver(GangFrameObserver* observer, uint8_t* buff) {
-	DCHECK(gang_thread_->IsCurrent());
-	video_frame_observer_ = observer;
-	decoder_->video_buff = buff;
-	if (observer) {
-		return Start();
-	}
-	if (!audio_frame_observer_) {
-		Stop(false);
-	}
-	return false;
-}
-
-bool GangDecoder::SetAudioObserver(GangFrameObserver* observer, uint8_t* buff) {
+void GangDecoder::SetAudioObserver_g(GangFrameObserver* observer, uint8_t* buff) {
 	DCHECK(gang_thread_->IsCurrent());
 	audio_frame_observer_ = observer;
 	decoder_->audio_buff = buff;
 	if (observer) {
-		return Start();
+		Start();
+		return;
 	}
 	if (!video_frame_observer_) {
 		Stop(false);
 	}
-	return false;
 }
 
 // TODO fix not to stop thread when toggle rec_enabled status.

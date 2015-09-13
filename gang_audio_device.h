@@ -196,8 +196,8 @@ private:
 	shared_ptr<GangDecoder> decoder_;
 	// 10ms in stereo @ 96kHz
 	uint8_t rec_buff_[kMaxBufferSizeBytes];
-	int len_bytes_per_10ms_;
-	int nb_samples_10ms_;
+	size_t len_bytes_per_10ms_;
+	size_t nb_samples_10ms_;
 
 	mutable rtc::CriticalSection lock_;
 	mutable rtc::CriticalSection lockCb_;
@@ -210,15 +210,15 @@ private:
 
 	// 2 or 4 depending on mono or stereo
 	// do not equal BytesPerSample in ffmpeg
-	uint8_t _recBytesPerSample;
+	size_t _recBytesPerSample;
 
 	uint32_t _currentMicLevel;
 	uint32_t _newMicLevel;
 
 	bool _typingStatus;
 
-	int _totalDelayMS;
-	int _clockDrift;
+	uint32_t _totalDelayMS;
+	int32_t _clockDrift;
 
 	uint16_t _record_index;
 };

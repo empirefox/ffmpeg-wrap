@@ -1,0 +1,3 @@
+eclipse.preferences.version=1
+providermemory=org.eclipse.linuxtools.profiling.provider.valgrind.helgrind
+use_projectmemory=true

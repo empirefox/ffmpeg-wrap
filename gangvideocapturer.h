@@ -2,6 +2,7 @@
 #define GANGVIDEOCAPTURER_H_
 
 #include <memory>
+#include "webrtc/base/thread_checker.h"
 #include "talk/media/base/videocapturer.h"
 #include "gang_decoder.h"
 
@@ -13,38 +14,56 @@ using cricket::CapturedFrame;
 
 namespace gang {
 
+VideoCapturer* CreateVideoCapturer(shared_ptr<GangDecoder> gang, rtc::Thread* thread);
+
+// Onwer signaling thread
 // Simulated video capturer that reads frames from a url.
 class GangVideoCapturer: public VideoCapturer, public GangFrameObserver {
 public:
+	explicit GangVideoCapturer(shared_ptr<GangDecoder> gang, rtc::Thread* thread);
 	virtual ~GangVideoCapturer();
-
-	static GangVideoCapturer* Create(shared_ptr<GangDecoder> gang, rtc::Thread* thread);
+	void Initialize();
 
 	// Override virtual methods of parent class VideoCapturer.
-	virtual CaptureState Start(const VideoFormat& capture_format);
-	virtual void Stop();
-	virtual bool IsRunning();
-	virtual bool IsScreencast() const {
+	CaptureState Start(const VideoFormat& capture_format) override;
+	void Stop() override;
+	bool IsRunning() override;
+	bool IsScreencast() const override {
 		return false;
 	}
 
+	// Called from gang when the capturer has been started.
+	void OnVideoStarted(bool success) override;
+	void OnVideoStopped() override;
+
+	// Called from gang when a new frame has been captured.
 	// Implements VideoFrameObserver
 	// data uint8*
-	virtual void OnGangFrame();
+	void OnGangFrame() override;
 
 protected:
-	explicit GangVideoCapturer(shared_ptr<GangDecoder> gang, rtc::Thread* thread);
-	void Initialize();
 	// Override virtual methods of parent class VideoCapturer.
-	virtual bool GetPreferredFourccs(std::vector<uint32>* fourccs);
+	bool GetPreferredFourccs(std::vector<uint32>* fourccs) override;
 
 private:
-	void stop();
+	class ThreadHandler;
+	void release_s();
+	void onVideoStarted_s(cricket::CaptureState new_state);
+	void onVideoStopped_s();
+	void onGangFrame_s();
 
-	CapturedFrame captured_frame_;
+	rtc::Thread* owner_thread_;
+	rtc::Thread* start_thread_;
+	ThreadHandler* start_thread_handler_;
 	shared_ptr<GangDecoder> gang_;
 	int64 start_time_ns_;  // Time when the capturer starts.
-	bool capture_;
+	int64 drop_interval_;
+	bool running_;
+	bool accept_;
+	cricket::CaptureState current_state_;
+
+	CapturedFrame captured_frame_;
+	rtc::ThreadChecker thread_checker_;
 	mutable rtc::CriticalSection crit_;
 
 	DISALLOW_COPY_AND_ASSIGN(GangVideoCapturer);

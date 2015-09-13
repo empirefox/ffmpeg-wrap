@@ -30,8 +30,11 @@ class GangFrameObserver {
 public:
 	// see "talk/media/webrtc/webrtcvideoframe.h"
 	virtual void OnGangFrame() = 0;
-protected:
-	~GangFrameObserver() {
+	virtual void OnVideoStarted(bool success) {
+	}
+	virtual void OnVideoStopped() {
+	}
+	virtual ~GangFrameObserver() {
 	}
 };
 
@@ -51,7 +54,7 @@ typedef rtc::TypedMessageData<bool> RecOnMsgData;
 class GangDecoder {
 public:
 	enum {
-		NEXT, REC_ON, START_REC, SHUTDOWN, VIDEO_OBSERVER, AUDIO_OBSERVER
+		NEXT, REC_ON, START_REC, SHUTDOWN, VIDEO_START, VIDEO_STOP, AUDIO_OBSERVER
 	};
 
 	explicit GangDecoder(
@@ -65,7 +68,6 @@ public:
 	~GangDecoder();
 
 	bool Init();
-	bool IsRunning();
 
 	// only in worker thread
 	bool Start();
@@ -74,30 +76,34 @@ public:
 	bool IsVideoAvailable();
 	bool IsAudioAvailable();
 
-	void SetVideoFrameObserver(GangFrameObserver* observer, uint8_t* buff);
+	void StartVideoCapture(GangFrameObserver* observer, uint8_t* buff);
+	void StopVideoCapture(GangFrameObserver* observer);
 	void SetAudioFrameObserver(GangFrameObserver* observer, uint8_t* buff);
 
-	void GetVideoInfo(int* width, int* height, int* fps);
+	void GetVideoInfo(int* width, int* height, int* fps, uint32* buf_size);
 	void GetAudioInfo(uint32_t* sample_rate, uint8_t* channels);
 
 	void SetRecordEnabled(bool enabled);
 	void SendStatus(GangStatus status);
 
+	// these can be called outside gang thread.
+	// but only at beginning or end.
 	void StartRec();
+	void Shutdown();
 
 protected:
+	void stop();
 	bool NextFrameLoop();
 	void SetRecOn(bool enabled);
 
 	// only in worker thread
-	bool SetVideoObserver(GangFrameObserver* observer, uint8_t* buff);
-	bool SetAudioObserver(GangFrameObserver* observer, uint8_t* buff);
+	void StartVideoCapture_g(GangFrameObserver* observer, uint8_t* buff);
+	void StopVideoCapture_g(GangFrameObserver* observer);
+	void SetAudioObserver_g(GangFrameObserver* observer, uint8_t* buff);
 
 	bool connected_;
 
 private:
-	void stop();
-
 	class GangThread; // Forward declaration, defined in .cc.
 
 	const std::string id_;
@@ -107,6 +113,8 @@ private:
 	GangFrameObserver* video_frame_observer_;
 	GangFrameObserver* audio_frame_observer_;
 	StatusObserver* status_observer_;
+
+	mutable rtc::CriticalSection crit_;
 
 	DISALLOW_COPY_AND_ASSIGN(GangDecoder);
 };

@@ -19,8 +19,8 @@ static const uint32 kAdmMaxIdleTimeProcess = 1000;
 
 // Constants here are derived by running VoE using a real ADM.
 // The constants correspond to 10ms of mono audio at 44kHz.
-static const int kTotalDelayMs = 0;
-static const int kClockDriftMs = 0;
+static const uint32_t kTotalDelayMs = 0;
+static const int32_t kClockDriftMs = 0;
 
 GangAudioDevice::GangAudioDevice(shared_ptr<GangDecoder> decoder) :
 				last_process_time_ms_(0),
@@ -556,8 +556,8 @@ void GangAudioDevice::Initialize() {
 	last_process_time_ms_ = rtc::Time();
 
 	decoder_->GetAudioInfo(&_recSampleRate, &_recChannels);
-	_recBytesPerSample = 2 * _recChannels; // 16 bits per sample in mono, 32 bits in stereo
-	nb_samples_10ms_ = _recSampleRate / 100; // must fix to rate
+	_recBytesPerSample = 2 * static_cast<size_t>(_recChannels); // 16 bits per sample in mono, 32 bits in stereo
+	nb_samples_10ms_ = static_cast<size_t>(_recSampleRate) / 100; // must fix to rate
 
 	switch (_recChannels) {
 	case 2:
@@ -598,7 +598,7 @@ void GangAudioDevice::OnGangFrame() {
 int32_t GangAudioDevice::DeliverRecordedData() {
 	uint32_t newMicLevel(0);
 	int32_t res = audio_callback_->RecordedDataIsAvailable( //
-			rec_buff_, // need interleaved data
+			static_cast<void*>(rec_buff_), // need interleaved data
 			nb_samples_10ms_, // 10ms samples
 			_recBytesPerSample,
 			_recChannels,

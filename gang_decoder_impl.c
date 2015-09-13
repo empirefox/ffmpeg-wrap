@@ -88,7 +88,7 @@ static void init_av_info(gang_decoder *dec) {
 				dec->fps = rate.num / rate.den;
 			} else {
 				// TODO maybe need calculate it.
-				dec->fps = 10000;
+				dec->fps = 25;
 			}
 			LOG_DEBUG(
 					"pix_fmt:%s, width:%d, height:%d, fps:%d, buff_size:%d",
