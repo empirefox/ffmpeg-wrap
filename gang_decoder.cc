@@ -70,12 +70,12 @@ public:
 				dec_->Start();
 				break;
 			case SHUTDOWN:
-				SPDLOG_TRACE(console, "{}", __FUNCTION__)
+				SPDLOG_TRACE(console, "{} SHUTDOWN", __FUNCTION__)
 				if (dec_->connected_)
 					dec_->stop();
 				Clear(this);
 				Quit();
-				SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "ok")
+				SPDLOG_TRACE(console, "{} SHUTDOWN ok", __FUNCTION__)
 				break;
 			default:
 				console->error("{} {}", __FUNCTION__, "unexpected msg type");
@@ -97,7 +97,7 @@ private:
 	int waiting_time_ms_;bool finished_;
 	mutable rtc::CriticalSection crit_;
 
-	DISALLOW_COPY_AND_ASSIGN(GangThread);
+	RTC_DISALLOW_COPY_AND_ASSIGN(GangThread);
 };
 
 GangDecoder::GangDecoder(const std::string& id, const std::string& url, const std::string& rec_name,

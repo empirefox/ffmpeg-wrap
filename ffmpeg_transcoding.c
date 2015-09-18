@@ -198,41 +198,34 @@ static int open_output_stream(FilterStreamContext *fsc, AVFormatContext *o_fmt_c
 // Create ofmt_ctx fs_ctx[i].os
 // Write file header
 // Require fs_ctx[i].is
-int open_output_streams(
-		const char *filename,
-		AVFormatContext **ofmt_ctx,
-		FilterStreamContext *fscs,
-		size_t fs_size,
-		int record_enabled) {
+int open_output_streams(gang_decoder* dec, int rec) {
 
-	AVFormatContext *ofmt_ctx_ = NULL;
 	char fullname[128];
 	unsigned int i;
 	int ret;
 
-	avformat_alloc_output_context2(ofmt_ctx, NULL, NULL, timed_name(fullname, filename));
-	ofmt_ctx_ = *ofmt_ctx;
-	if (!ofmt_ctx_) {
+	avformat_alloc_output_context2(&dec->ofmt_ctx, NULL, NULL, timed_name(fullname, dec->rec_name));
+	if (!dec->ofmt_ctx) {
 		LOG_ERROR("Could not create output context");
 		return AVERROR_UNKNOWN;
 	}
-	for (i = 0; i < fs_size; i++) {
-		ret = open_output_stream(&fscs[i], ofmt_ctx_);
+	for (i = 0; i < dec->fsc_size; i++) {
+		ret = open_output_stream(&dec->fscs[i], dec->ofmt_ctx);
 		if (ret < 0) {
 			LOG_ERROR("open_output_stream failed");
 			return ret;
 		}
 	}
 
-	av_dump_format(ofmt_ctx_, 0, fullname, 1);
+	av_dump_format(dec->ofmt_ctx, 0, fullname, 1);
 
-	if (!record_enabled) {
+	if (!rec) {
 		LOG_DEBUG("no record");
 		return 0;
 	}
 
-	if (!(ofmt_ctx_->oformat->flags & AVFMT_NOFILE)) {
-		ret = avio_open(&ofmt_ctx_->pb, fullname, AVIO_FLAG_WRITE);
+	if (!(dec->ofmt_ctx->oformat->flags & AVFMT_NOFILE)) {
+		ret = avio_open(&dec->ofmt_ctx->pb, fullname, AVIO_FLAG_WRITE);
 		if (ret < 0) {
 			LOG_INFO("Could not open output file '%s'", fullname);
 			return ret;
@@ -240,11 +233,12 @@ int open_output_streams(
 	}
 
 	/* init muxer, write output file header */
-	ret = avformat_write_header(ofmt_ctx_, NULL);
+	ret = avformat_write_header(dec->ofmt_ctx, NULL);
 	if (ret < 0) {
 		LOG_ERROR("Error occurred when opening output file");
 		return ret;
 	}
+	dec->recording = 1;
 
 	return 0;
 }

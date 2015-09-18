@@ -116,7 +116,7 @@ private:
 
 	mutable rtc::CriticalSection crit_;
 
-	DISALLOW_COPY_AND_ASSIGN(GangDecoder);
+	RTC_DISALLOW_COPY_AND_ASSIGN(GangDecoder);
 };
 
 }

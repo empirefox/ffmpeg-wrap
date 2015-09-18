@@ -33,6 +33,7 @@ gang_decoder *new_gang_decoder(const char *url, const char *rec_name, int rec_on
 		dec->no_video = 1;
 		dec->no_audio = 1;
 		dec->waitkey = 1;
+		dec->recording = 0;
 		dec->width = 0;
 		dec->height = 0;
 		dec->fps = 0;
@@ -115,7 +116,7 @@ int init_gang_av_info(gang_decoder *dec) {
 	int err;
 	err = open_input_streams(dec);
 	if (!err)
-		err = open_output_streams(dec->rec_name, &dec->ofmt_ctx, dec->fscs, dec->fsc_size, 0);
+		err = open_output_streams(dec, 0);
 	if (!err)
 		init_av_info(dec);
 	close_gang_decoder(dec);
@@ -128,12 +129,7 @@ int open_gang_decoder(gang_decoder *dec) {
 
 	err = open_input_streams(dec);
 	if (!err)
-		err = open_output_streams(
-				dec->rec_name,
-				&dec->ofmt_ctx,
-				dec->fscs,
-				dec->fsc_size,
-				dec->rec_enabled);
+		err = open_output_streams(dec, dec->rec_enabled);
 	if (!err)
 		err = init_filters(dec->fscs, dec->fsc_size);
 	if (!err)
@@ -262,7 +258,7 @@ static int filter_encode_write_frame(gang_decoder* dec, FilterStreamContext *fsc
 		}
 
 		// write to record file
-		if (dec->rec_enabled) {
+		if (dec->recording) {
 			ret = encode_write_frame(dec, fsc, NULL);
 			if (ret < 0) {
 				LOG_DEBUG("encode_write_frame error");
@@ -331,7 +327,7 @@ int flush_gang_rec_encoder(gang_decoder* dec) {
 	int i;
 	int ret;
 
-	if (!dec->ofmt_ctx || !dec->rec_enabled) {
+	if (!dec->ofmt_ctx || !dec->recording) {
 		return 0;
 	}
 	/* flush filters and encoders */
@@ -358,5 +354,6 @@ int flush_gang_rec_encoder(gang_decoder* dec) {
 	ret = av_write_trailer(dec->ofmt_ctx);
 	if (ret)
 		LOG_ERROR("Error occurred when trail output file");
+	dec->recording = 0;
 	return ret;
 }

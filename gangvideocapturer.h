@@ -66,7 +66,7 @@ private:
 	rtc::ThreadChecker thread_checker_;
 	mutable rtc::CriticalSection crit_;
 
-	DISALLOW_COPY_AND_ASSIGN(GangVideoCapturer);
+	RTC_DISALLOW_COPY_AND_ASSIGN(GangVideoCapturer);
 };
 
 }  // namespace gang

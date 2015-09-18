@@ -16,12 +16,7 @@ extern "C" {
 
 int open_input_streams(gang_decoder* dec);
 
-int open_output_streams(
-		const char *filename,
-		AVFormatContext **ofmt_ctx,
-		FilterStreamContext *fscs,
-		size_t fs_size,
-		int record_enabled);
+int open_output_streams(gang_decoder* dec, int record_enabled);
 
 int init_filters(FilterStreamContext *fscs, size_t n);
 

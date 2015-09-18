@@ -37,6 +37,7 @@ typedef struct gang_decoder {
 	int no_video;
 	int no_audio;
 	int waitkey;
+	int recording;
 
 	//vidio
 	int width;
