@@ -97,7 +97,8 @@ private:
 	int waiting_time_ms_;bool finished_;
 	mutable rtc::CriticalSection crit_;
 
-	RTC_DISALLOW_COPY_AND_ASSIGN(GangThread);
+	RTC_DISALLOW_COPY_AND_ASSIGN(GangThread)
+	;
 };
 
 GangDecoder::GangDecoder(const std::string& id, const std::string& url, const std::string& rec_name,
@@ -150,6 +151,13 @@ bool GangDecoder::IsVideoAvailable() {
 
 bool GangDecoder::IsAudioAvailable() {
 	return !decoder_->no_audio;
+}
+
+void GangDecoder::GetClientVideoInfo(int* width, int* height, int* no_video, int* no_audio) {
+	*width = decoder_->width;
+	*height = decoder_->height;
+	*no_video = decoder_->no_video;
+	*no_audio = decoder_->no_audio;
 }
 
 void GangDecoder::GetVideoInfo(int* width, int* height, int* fps, uint32* buf_size) {

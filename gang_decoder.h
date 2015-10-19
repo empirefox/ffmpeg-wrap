@@ -80,6 +80,7 @@ public:
 	void StopVideoCapture(GangFrameObserver* observer);
 	void SetAudioFrameObserver(GangFrameObserver* observer, uint8_t* buff);
 
+	void GetClientVideoInfo(int* width, int* height, int* no_video, int* no_audio);
 	void GetVideoInfo(int* width, int* height, int* fps, uint32* buf_size);
 	void GetAudioInfo(uint32_t* sample_rate, uint8_t* channels);
 
@@ -116,7 +117,8 @@ private:
 
 	mutable rtc::CriticalSection crit_;
 
-	RTC_DISALLOW_COPY_AND_ASSIGN(GangDecoder);
+	RTC_DISALLOW_COPY_AND_ASSIGN(GangDecoder)
+	;
 };
 
 }
