@@ -29,5 +29,6 @@
 
 Release
 Debug
+build
 *.zargo~
 .gitignore~

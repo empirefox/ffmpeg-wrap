@@ -42,18 +42,18 @@ GangAudioDevice::GangAudioDevice(shared_ptr<GangDecoder> decoder) :
 				_record_index(0) {
 
 	memset(rec_buff_, 0, kMaxBufferSizeBytes);
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 }
 
 GangAudioDevice::~GangAudioDevice() {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	rtc::CritScope cs(&lock_);
 	if (recording_) {
 		recording_ = false;
 		decoder_->SetAudioFrameObserver(NULL, NULL);
 	}
 	decoder_ = NULL;
-	SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "error")
+	SPDLOG_TRACE(console, "{} {}", __func__, "error")
 }
 
 rtc::scoped_refptr<GangAudioDevice> GangAudioDevice::Create(shared_ptr<GangDecoder> decoder) {
@@ -67,7 +67,7 @@ rtc::scoped_refptr<GangAudioDevice> GangAudioDevice::Create(shared_ptr<GangDecod
 }
 
 int64_t GangAudioDevice::TimeUntilNextProcess() {
-//	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+//	SPDLOG_TRACE(console, "{}", __func__)
 	const uint32 current_time = rtc::Time();
 	if (current_time < last_process_time_ms_) {
 		// TODO: wraparound could be handled more gracefully.
@@ -81,59 +81,59 @@ int64_t GangAudioDevice::TimeUntilNextProcess() {
 }
 
 int32_t GangAudioDevice::Process() {
-//	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+//	SPDLOG_TRACE(console, "{}", __func__)
 	last_process_time_ms_ = rtc::Time();
 	return 0;
 }
 
 int32_t GangAudioDevice::ActiveAudioLayer(AudioLayer* audio_layer) const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 webrtc::AudioDeviceModule::ErrorCode GangAudioDevice::LastError() const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return webrtc::AudioDeviceModule::kAdmErrNone;
 }
 
 int32_t GangAudioDevice::RegisterEventObserver(webrtc::AudioDeviceObserver* event_callback) {
 	// Only used to report warnings and errors. This fake implementation won't
 	// generate any so discard this callback.
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return 0;
 }
 
 int32_t GangAudioDevice::RegisterAudioCallback(webrtc::AudioTransport* audio_callback) {
 	rtc::CritScope cs(&lockCb_);
 	audio_callback_ = audio_callback;
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return 0;
 }
 
 int32_t GangAudioDevice::Init() {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	// Initialize is called by the factory method. Safe to ignore this Init call.
 	return 0;
 }
 
 int32_t GangAudioDevice::Terminate() {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	// Clean up in the destructor. No action here, just success.
 	return 0;
 }
 
 bool GangAudioDevice::Initialized() const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return decoder_.get() != NULL;
 }
 
 int16_t GangAudioDevice::PlayoutDevices() {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return 0;
 }
 
 int16_t GangAudioDevice::RecordingDevices() {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return 1;
 }
 
@@ -141,7 +141,7 @@ int32_t GangAudioDevice::PlayoutDeviceName(
 		uint16_t index,
 		char name[webrtc::kAdmMaxDeviceNameSize],
 		char guid[webrtc::kAdmMaxGuidSize]) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return 0;
 }
 
@@ -150,7 +150,7 @@ int32_t GangAudioDevice::RecordingDeviceName(
 		char name[kAdmMaxDeviceNameSize],
 		char guid[kAdmMaxGuidSize]) {
 
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	// TODO give device a actual name
 	const char* kName = "gang_audio_device";
 	const char* kGuid = "gang_audio_unique_id";
@@ -166,17 +166,17 @@ int32_t GangAudioDevice::RecordingDeviceName(
 
 int32_t GangAudioDevice::SetPlayoutDevice(uint16_t index) {
 	// No playout device, just playing from file. Return success.
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return 0;
 }
 
 int32_t GangAudioDevice::SetPlayoutDevice(AudioDeviceModule::WindowsDeviceType device) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::SetRecordingDevice(uint16_t index) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	if (index == 0) {
 		_record_index = index;
 		return _record_index;
@@ -185,27 +185,27 @@ int32_t GangAudioDevice::SetRecordingDevice(uint16_t index) {
 }
 
 int32_t GangAudioDevice::SetRecordingDevice(AudioDeviceModule::WindowsDeviceType device) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::PlayoutIsAvailable(bool* available) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return 0;
 }
 
 int32_t GangAudioDevice::InitPlayout() {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return 0;
 }
 
 bool GangAudioDevice::PlayoutIsInitialized() const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return true;
 }
 
 int32_t GangAudioDevice::RecordingIsAvailable(bool* available) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	if (_record_index == 0) {
 		*available = true;
 		return _record_index;
@@ -215,27 +215,27 @@ int32_t GangAudioDevice::RecordingIsAvailable(bool* available) {
 }
 
 int32_t GangAudioDevice::InitRecording() {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return 0;
 }
 
 bool GangAudioDevice::RecordingIsInitialized() const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return true;
 }
 
 int32_t GangAudioDevice::StartPlayout() {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return 0;
 }
 
 int32_t GangAudioDevice::StopPlayout() {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return 0;
 }
 
 bool GangAudioDevice::Playing() const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return true;
 }
 
@@ -244,7 +244,7 @@ int32_t GangAudioDevice::StartRecording() {
 	if (!rec_is_initialized_) {
 		return -1;
 	}
-	SPDLOG_DEBUG(console, "{}", __FUNCTION__)
+	SPDLOG_DEBUG(console, "{}", __func__)
 	rtc::CritScope cs(&lock_);
 	recording_ = true;
 	decoder_->SetAudioFrameObserver(this, rec_buff_);
@@ -253,7 +253,7 @@ int32_t GangAudioDevice::StartRecording() {
 
 // TODO StopRecording
 int32_t GangAudioDevice::StopRecording() {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	rtc::CritScope cs(&lock_);
 	if (recording_) {
 		decoder_->SetAudioFrameObserver(NULL, NULL);
@@ -263,160 +263,160 @@ int32_t GangAudioDevice::StopRecording() {
 }
 
 bool GangAudioDevice::Recording() const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	rtc::CritScope cs(&lock_);
 	return recording_;
 }
 
 int32_t GangAudioDevice::SetAGC(bool enable) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	// No Automatic gain control
 	return -1;
 }
 
 bool GangAudioDevice::AGC() const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return false;
 }
 
 int32_t GangAudioDevice::SetWaveOutVolume(uint16_t volumeLeft, uint16_t volumeRight) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::WaveOutVolume(uint16_t* volume_left, uint16_t* volume_right) const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::InitSpeaker() {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 bool GangAudioDevice::SpeakerIsInitialized() const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return false;
 }
 
 int32_t GangAudioDevice::InitMicrophone() {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	// No microphone, just playing from file. Return success.
 	return 0;
 }
 
 bool GangAudioDevice::MicrophoneIsInitialized() const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return true;
 }
 
 int32_t GangAudioDevice::SpeakerVolumeIsAvailable(bool* available) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::SetSpeakerVolume(uint32_t /*volume*/) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::SpeakerVolume(uint32_t* /*volume*/) const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::MaxSpeakerVolume(uint32_t* /*max_volume*/) const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::MinSpeakerVolume(uint32_t* /*min_volume*/) const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::SpeakerVolumeStepSize(uint16_t* /*step_size*/) const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::MicrophoneVolumeIsAvailable(bool* available) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::SetMicrophoneVolume(uint32_t volume) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::MicrophoneVolume(uint32_t* volume) const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::MaxMicrophoneVolume(uint32_t* max_volume) const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::MinMicrophoneVolume(uint32_t* /*min_volume*/) const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::MicrophoneVolumeStepSize(uint16_t* /*step_size*/) const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::SpeakerMuteIsAvailable(bool* /*available*/) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::SetSpeakerMute(bool /*enable*/) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::SpeakerMute(bool* /*enabled*/) const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::MicrophoneMuteIsAvailable(bool* /*available*/) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::SetMicrophoneMute(bool /*enable*/) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::MicrophoneMute(bool* /*enabled*/) const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::MicrophoneBoostIsAvailable(bool* /*available*/) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::SetMicrophoneBoost(bool /*enable*/) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::MicrophoneBoost(bool* /*enabled*/) const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::StereoPlayoutIsAvailable(bool* available) const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	// No recording device, just dropping audio. Stereo can be dropped just
 	// as easily as mono.
 	*available = true;
@@ -424,100 +424,100 @@ int32_t GangAudioDevice::StereoPlayoutIsAvailable(bool* available) const {
 }
 
 int32_t GangAudioDevice::SetStereoPlayout(bool /*enable*/) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	// No recording device, just dropping audio. Stereo can be dropped just
 	// as easily as mono.
 	return 0;
 }
 
 int32_t GangAudioDevice::StereoPlayout(bool* /*enabled*/) const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return 0;
 }
 
 int32_t GangAudioDevice::StereoRecordingIsAvailable(bool* available) const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	// Keep thing simple. No stereo recording.
 	*available = true;
 	return 0;
 }
 
 int32_t GangAudioDevice::SetStereoRecording(bool enable) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return 0;
 }
 
 int32_t GangAudioDevice::StereoRecording(bool* enabled) const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	*enabled = true;
 	return 0;
 }
 
 int32_t GangAudioDevice::SetRecordingChannel(const ChannelType channel) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::RecordingChannel(ChannelType* channel) const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	*channel = _recChannel;
 	return 0;
 }
 
 int32_t GangAudioDevice::SetPlayoutBuffer(const BufferType /*type*/, uint16_t /*size_ms*/) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return 0;
 }
 
 int32_t GangAudioDevice::PlayoutBuffer(BufferType* /*type*/, uint16_t* /*size_ms*/) const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return 0;
 }
 
 int32_t GangAudioDevice::PlayoutDelay(uint16_t* delay_ms) const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return 0;
 }
 
 int32_t GangAudioDevice::RecordingDelay(uint16_t* /*delay_ms*/) const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::CPULoad(uint16_t* /*load*/) const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::StartRawOutputFileRecording(
 		const char /*pcm_file_name_utf8*/[webrtc::kAdmMaxFileNameSize]) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return 0;
 }
 
 int32_t GangAudioDevice::StopRawOutputFileRecording() {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return 0;
 }
 
 int32_t GangAudioDevice::StartRawInputFileRecording(
 		const char /*pcm_file_name_utf8*/[webrtc::kAdmMaxFileNameSize]) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return 0;
 }
 
 int32_t GangAudioDevice::StopRawInputFileRecording() {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return 0;
 }
 
 int32_t GangAudioDevice::SetRecordingSampleRate(const uint32_t /*samples_per_sec*/) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return 0;
 }
 
 int32_t GangAudioDevice::RecordingSampleRate(uint32_t* samples_per_sec) const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	if (_recSampleRate == 0) {
 		return -1;
 	}
@@ -526,33 +526,33 @@ int32_t GangAudioDevice::RecordingSampleRate(uint32_t* samples_per_sec) const {
 }
 
 int32_t GangAudioDevice::SetPlayoutSampleRate(const uint32_t /*samples_per_sec*/) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return 0;
 }
 
 int32_t GangAudioDevice::PlayoutSampleRate(uint32_t* /*samples_per_sec*/) const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	ASSERT(false);
 	return 0;
 }
 
 int32_t GangAudioDevice::ResetAudioDevice() {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::SetLoudspeakerStatus(bool /*enable*/) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 int32_t GangAudioDevice::GetLoudspeakerStatus(bool* /*enabled*/) const {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	return -1;
 }
 
 void GangAudioDevice::Initialize() {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	last_process_time_ms_ = rtc::Time();
 
 	decoder_->GetAudioInfo(&_recSampleRate, &_recChannels);

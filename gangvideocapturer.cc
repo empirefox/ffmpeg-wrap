@@ -15,7 +15,7 @@ VideoCapturer* CreateVideoCapturer(shared_ptr<GangDecoder> gang, rtc::Thread* th
 	}
 	rtc::scoped_ptr<GangVideoCapturer> capturer(new GangVideoCapturer(gang, thread));
 	if (!capturer.get()) {
-		SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "error")
+		SPDLOG_TRACE(console, "{} {}", __func__, "error")
 		return NULL;
 	}
 	capturer->Initialize();
@@ -48,7 +48,7 @@ public:
 	}
 
 	void OnCpuAdaptationSignalled() {
-		SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "ok")
+		SPDLOG_TRACE(console, "{} {}", __func__, "ok")
 	}
 private:
 	GangVideoCapturer* capture_;
@@ -65,16 +65,16 @@ GangVideoCapturer::GangVideoCapturer(shared_ptr<GangDecoder> gang, rtc::Thread* 
 				running_(false),
 				accept_(false),
 				current_state_(cricket::CS_STOPPED) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 }
 
 GangVideoCapturer::~GangVideoCapturer() {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	CHECK(owner_thread_->IsCurrent());
 	SignalFrameCaptured.disconnect_all();
 	crit_.Enter();
 	crit_.Leave();
-	SPDLOG_TRACE(console, "{} waited stopped ok", __FUNCTION__)
+	SPDLOG_TRACE(console, "{} waited stopped ok", __func__)
 	CHECK(!running_);
 	delete start_thread_handler_;
 	start_thread_handler_ = NULL;
@@ -87,12 +87,12 @@ GangVideoCapturer::~GangVideoCapturer() {
 	cricket::VariableInfo<double> capturer_frame_time;
 	cricket::VideoFormat format;
 	GetStats(&adapt_frame_drops, NULL, &capturer_frame_time, &format);
-	SPDLOG_TRACE(console, "{} video_adapter", __FUNCTION__)
+	SPDLOG_TRACE(console, "{} video_adapter", __func__)
 
 	cricket::CoordinatedVideoAdapter* va = video_adapter();
 	sigslot::signal0<>& sg = va->SignalCpuAdaptationUnable;
 	sg.disconnect_all();
-	SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "ok")
+	SPDLOG_TRACE(console, "{} {}", __func__, "ok")
 }
 
 void GangVideoCapturer::Initialize() {
@@ -130,7 +130,7 @@ void GangVideoCapturer::Initialize() {
 // TODO(wuwang): Design an E2E integration test for video adaptation,
 // then remove the below call to disable the video adapter.
 	set_enable_video_adapter(false);
-	SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "ok")
+	SPDLOG_TRACE(console, "{} {}", __func__, "ok")
 }
 
 CaptureState GangVideoCapturer::Start(const VideoFormat& capture_format) {
@@ -142,7 +142,7 @@ CaptureState GangVideoCapturer::Start(const VideoFormat& capture_format) {
 	accept_ = true;
 	running_ = true;
 	gang_->StartVideoCapture(this, static_cast<uint8_t*>(captured_frame_.data));
-	SPDLOG_TRACE(console, "{}: {}", __FUNCTION__, "sent")
+	SPDLOG_TRACE(console, "{}: {}", __func__, "sent")
 	current_state_ = cricket::CS_STARTING;
 	return current_state_;
 }
@@ -155,11 +155,11 @@ void GangVideoCapturer::Stop() {
 	gang_->StopVideoCapture(this);
 //	current_state_ = cricket::CS_STOPPED;
 //	SignalStateChange(this, current_state_);
-	SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "sent")
+	SPDLOG_TRACE(console, "{} {}", __func__, "sent")
 }
 
 bool GangVideoCapturer::IsRunning() {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	CHECK(thread_checker_.CalledOnValidThread());
 	return running_;
 }
@@ -175,14 +175,14 @@ void GangVideoCapturer::OnVideoStarted(bool success) {
 	start_thread_->Post(start_thread_handler_, success ? VIDEO_START_OK : VIDEO_START_FAILED);
 }
 void GangVideoCapturer::onVideoStarted_s(cricket::CaptureState new_state) {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	CHECK(thread_checker_.CalledOnValidThread());
 	if (new_state == current_state_)
 		return;
 	current_state_ = new_state;
 	SetCaptureState(new_state);
 	start_time_ns_ = static_cast<int64>(rtc::TimeNanos());
-	SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "ok")
+	SPDLOG_TRACE(console, "{} {}", __func__, "ok")
 }
 
 void GangVideoCapturer::OnVideoStopped() {
@@ -194,7 +194,7 @@ void GangVideoCapturer::onVideoStopped_s() {
 	SetCaptureFormat(NULL);
 	onVideoStarted_s(cricket::CS_STOPPED);
 	crit_.Leave();
-	SPDLOG_TRACE(console, "{} indeed stopped", __FUNCTION__)
+	SPDLOG_TRACE(console, "{} indeed stopped", __func__)
 }
 
 void GangVideoCapturer::OnGangFrame() {

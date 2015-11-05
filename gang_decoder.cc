@@ -20,9 +20,9 @@ public:
 	}
 
 	virtual ~GangThread() {
-		SPDLOG_TRACE(console, "{}", __FUNCTION__)
+		SPDLOG_TRACE(console, "{}", __func__)
 		Stop();
-		SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "ok")
+		SPDLOG_TRACE(console, "{} {}", __func__, "ok")
 	}
 
 	// Override virtual method of parent Thread. Context: Worker Thread.
@@ -70,15 +70,15 @@ public:
 				dec_->Start();
 				break;
 			case SHUTDOWN:
-				SPDLOG_TRACE(console, "{} SHUTDOWN", __FUNCTION__)
+				SPDLOG_TRACE(console, "{} SHUTDOWN", __func__)
 				if (dec_->connected_)
 					dec_->stop();
 				Clear(this);
 				Quit();
-				SPDLOG_TRACE(console, "{} SHUTDOWN ok", __FUNCTION__)
+				SPDLOG_TRACE(console, "{} SHUTDOWN ok", __func__)
 				break;
 			default:
-				console->error("{} {}", __FUNCTION__, "unexpected msg type");
+				console->error("{} {}", __func__, "unexpected msg type");
 				break;
 			}
 		} else {
@@ -112,11 +112,11 @@ bool rec_on, bool audio_off, Thread* worker_thread, StatusObserver* status_obser
 				audio_frame_observer_(NULL),
 				status_observer_(status_observer) {
 	gang_thread_->Start();
-	SPDLOG_TRACE(console, "{}: url: {}, rec_name: {}", __FUNCTION__, url, rec_name)
+	SPDLOG_TRACE(console, "{}: url: {}, rec_name: {}", __func__, url, rec_name)
 }
 
 GangDecoder::~GangDecoder() {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	if (gang_thread_) {
 		gang_thread_->Post(gang_thread_, SHUTDOWN);
 		delete gang_thread_;
@@ -126,16 +126,16 @@ GangDecoder::~GangDecoder() {
 		::free_gang_decoder(decoder_);
 		decoder_ = NULL;
 	}
-	SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "ok")
+	SPDLOG_TRACE(console, "{} {}", __func__, "ok")
 }
 
 void GangDecoder::Shutdown() {
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	if (gang_thread_) {
 		gang_thread_->Post(gang_thread_, SHUTDOWN);
 		gang_thread_->Stop();
 	}
-	SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "ok")
+	SPDLOG_TRACE(console, "{} {}", __func__, "ok")
 }
 
 bool GangDecoder::Init() {
@@ -176,12 +176,12 @@ void GangDecoder::stop() {
 	connected_ = false;
 	::flush_gang_rec_encoder(decoder_);
 	::close_gang_decoder(decoder_);
-	SPDLOG_TRACE(console, "{}: {}", __FUNCTION__, "shutdown")
+	SPDLOG_TRACE(console, "{}: {}", __func__, "shutdown")
 }
 
 bool GangDecoder::Start() {
 	DCHECK(gang_thread_->IsCurrent());
-	SPDLOG_TRACE(console, "{}", __FUNCTION__)
+	SPDLOG_TRACE(console, "{}", __func__)
 	if (gang_thread_->Finished()) {
 		return false;
 	}
@@ -203,13 +203,13 @@ bool GangDecoder::Start() {
 
 void GangDecoder::Stop(bool force) {
 	DCHECK(gang_thread_->IsCurrent());
-	SPDLOG_TRACE(console, "{}: {}", __FUNCTION__, force)
+	SPDLOG_TRACE(console, "{}: {}", __func__, force)
 	if (!force && decoder_->rec_enabled) {
 		return;
 	}
 	stop();
 	gang_thread_->Clear(gang_thread_, NEXT);
-	SPDLOG_TRACE(console, "{}: {}", __FUNCTION__, "ok")
+	SPDLOG_TRACE(console, "{}: {}", __func__, "ok")
 }
 
 // return true->continue, false->end
@@ -228,7 +228,7 @@ bool GangDecoder::NextFrameLoop() {
 		}
 		break;
 	case GANG_FITAL: // end loop
-		SPDLOG_TRACE(console, "{}: {}", __FUNCTION__, "GANG_FITAL")
+		SPDLOG_TRACE(console, "{}: {}", __func__, "GANG_FITAL")
 		SendStatus(Dead);
 		return false;
 	case GANG_ERROR_DATA: // ignore and next
@@ -307,7 +307,7 @@ void GangDecoder::SetRecOn(bool enabled) {
 	Stop(true);
 	decoder_->rec_enabled = enabled;
 	if (enabled || video_frame_observer_ || audio_frame_observer_) {
-		SPDLOG_TRACE(console, "{} {}", __FUNCTION__, "restart")
+		SPDLOG_TRACE(console, "{} {}", __func__, "restart")
 		Start();
 	}
 }

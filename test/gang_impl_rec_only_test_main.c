@@ -38,4 +38,3 @@ int main(int argc, char **argv) {
 	initialize_gang_decoder_globel();
 	return run(argv[1], argv[2]);
 }
-
