@@ -1,0 +1,11 @@
+{
+    "c": {
+        "configPath": ".uncrustify.cfg"
+    },
+    "cpp": {
+        "configPath": ".uncrustify.cfg"
+    },
+    "objectivec": {
+        "configPath": ".uncrustify.cfg"
+    }
+}

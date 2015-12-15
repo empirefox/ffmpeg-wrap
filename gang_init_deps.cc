@@ -1,10 +1,3 @@
-/*
- * gang_init_deps.cc
- *
- *  Created on: May 2, 2015
- *      Author: savage
- */
-
 #include "gang_init_deps.h"
 
 #include "webrtc/common_audio/signal_processing/include/signal_processing_library.h"
@@ -13,17 +6,14 @@
 #include "gang_spdlog_console.h"
 
 namespace gang {
-
 void InitializeGangDecoderGlobel() {
-	InitGangSpdlogConsole();
-	::initialize_gang_decoder_globel();
-	WebRtcSpl_Init();
+  InitGangSpdlogConsole();
+  ::initialize_gang_decoder_globel();
+  WebRtcSpl_Init();
 }
 
 void CleanupGangDecoderGlobel() {
-	::cleanup_gang_decoder_globel();
-	CleanupGangSpdlog();
+  ::cleanup_gang_decoder_globel();
+  CleanupGangSpdlog();
 }
-
 } // namespace gang
-

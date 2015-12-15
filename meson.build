@@ -1,6 +1,5 @@
 project('ffmpeg-wrap', 'c', 'cpp')
 add_global_arguments('-fno-rtti', language : 'cpp')
-#add_global_arguments('-Wall', language : 'cpp')
 add_global_arguments('-pthread', language : 'cpp')
 #add_global_arguments('-Wno-variadic-macros', language : 'c')
 
